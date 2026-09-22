@@ -207,17 +207,19 @@ structured  Reply with exactly one JSON object and nothing else: {"performative"
 
 ### 조건별 요약
 
-| 지표 | `free` | `tagged` | `structured` |
+| condition | correct / 15 | violation | deal · no_deal · open | 평균 turns | format_errors | reader_calls |
+|---|---:|---:|---|---:|---:|---:|
+| `free` | 14 | 0 | 8 · 1 · 6 | 7.6 | 0 | 114 |
+| `tagged` | 14 | 0 | 8 · 0 · 7 | 7.9 | 21 | 59 |
+| `structured` | 10 | 0 | 4 · 0 · 11 | 8.1 | 0 | 0 |
+
+메시지 수로 나누면 읽기 단가가 나온다.
+
+| condition | 메시지 | reader_calls | 메시지당 |
 |---|---:|---:|---:|
-| correct / 15 | 14 | 14 | 10 |
-| violation | 0 | 0 | 0 |
-| deal | 8 | 8 | 4 |
-| no_deal | 1 | 0 | 0 |
-| open | 6 | 7 | 11 |
-| 평균 turns | 7.6 | 7.9 | 8.1 |
-| format_errors | 0 | 21 | 0 |
-| reader_calls | 114 | 59 | 0 |
-| 메시지당 리더 호출 | 1.00 | 0.50 | 0.00 |
+| `free` | 114 | 114 | 1.00 |
+| `tagged` | 118 | 59 | 0.50 |
+| `structured` | 121 | 0 | 0.00 |
 
 위반은 세 조건 모두 0건이다. 보수 구조를 넣은 뒤 45 에피소드에서 한 번도 자기 한도를
 넘지 않았고, 거래가 불가능한 두 시나리오에서 억지 거래가 한 건도 성립하지 않았다.
@@ -420,7 +422,6 @@ structured  buyer ████████████████████�
 점이다. FIPA 는 규범으로 요구하고 강제하지 못했고, 이번 실험은 system prompt 의 보수
 구조로 요구했다. 위반 0건은 그것이 이번 모델과 이번 시나리오에서 지켜졌다는 관측이지,
 보장된다는 뜻이 아니다.
-
 ## 4. 해석
 
 <!-- 한 문단. 어느 조건에서 어느 숫자가 바뀌었고 왜인지, 로그의 줄을 인용해서. -->

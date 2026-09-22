@@ -295,17 +295,20 @@ w("## 2. 결과")
 w("")
 w("### 조건별 요약")
 w("")
-w("| 지표 | `free` | `tagged` | `structured` |")
+w("| condition | correct / 15 | violation | deal · no_deal · open | 평균 turns | format_errors | reader_calls |")
+w("|---|---:|---:|---|---:|---:|---:|")
+for c in COND:
+    w("| `%s` | %d | %d | %d · %d · %d | %.1f | %d | %d |"
+      % (c, S[c]["correct"], S[c]["viol"], S[c]["deal"], S[c]["no_deal"],
+         S[c]["opn"], S[c]["turns"], S[c]["fmt"], S[c]["reader"]))
+w("")
+w("메시지 수로 나누면 읽기 단가가 나온다.")
+w("")
+w("| condition | 메시지 | reader_calls | 메시지당 |")
 w("|---|---:|---:|---:|")
-w("| correct / 15 | " + row3("%(correct)d") + " |")
-w("| violation | " + row3("%(viol)d") + " |")
-w("| deal | " + row3("%(deal)d") + " |")
-w("| no_deal | " + row3("%(no_deal)d") + " |")
-w("| open | " + row3("%(opn)d") + " |")
-w("| 평균 turns | " + row3("%(turns).1f") + " |")
-w("| format_errors | " + row3("%(fmt)d") + " |")
-w("| reader_calls | " + row3("%(reader)d") + " |")
-w("| 메시지당 리더 호출 | " + " | ".join("%.2f" % (S[c]["reader"] / S[c]["msgs"]) for c in COND) + " |")
+for c in COND:
+    w("| `%s` | %d | %d | %.2f |"
+      % (c, S[c]["msgs"], S[c]["reader"], S[c]["reader"] / S[c]["msgs"]))
 w("")
 w("위반은 세 조건 모두 0건이다. 보수 구조를 넣은 뒤 45 에피소드에서 한 번도 자기 한도를")
 w("넘지 않았고, 거래가 불가능한 두 시나리오에서 억지 거래가 한 건도 성립하지 않았다.")
@@ -487,5 +490,16 @@ w("")
 w("<!-- 한 문단. 어느 조건에서 어느 숫자가 바뀌었고 왜인지, 로그의 줄을 인용해서. -->")
 w("")
 
-open("REPORT.md", "w", encoding="utf-8", newline="\n").write("\n".join(O) + "\n")
+# Part 4 is written by hand. When REPORT.md already has one, keep it verbatim
+# and replace only parts 1-3, so regenerating never eats the interpretation.
+PART4 = "## 4. 해석"
+cut = O.index(PART4)
+body, tail = "\n".join(O[:cut]), "\n".join(O[cut:])
+if os.path.exists("REPORT.md"):
+    prev = open("REPORT.md", encoding="utf-8").read()
+    at = prev.find(PART4)
+    if at != -1 and prev[at:].strip() != tail.strip():
+        tail = prev[at:].rstrip()
+        print("kept the existing part 4")
+open("REPORT.md", "w", encoding="utf-8", newline="\n").write(body + tail + "\n")
 print("wrote REPORT.md,", len(O), "lines")
