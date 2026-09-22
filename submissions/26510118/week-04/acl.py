@@ -32,16 +32,23 @@ ROLE = {
 # not in this vocabulary, so an opening question has no act to map to. That gap
 # is one of the things this lab measures, so it is not patched here.
 #
-# The turn limit is deliberately NOT stated to the agents. Both sides negotiate
-# without seeing the clock, so `open` records a negotiation that did not
-# converge rather than one that raced a deadline it knew about.
+# The turn limit IS stated. Hiding it was tried first and every episode ran to
+# `open`: rejecting costs a greedy agent nothing when the clock is invisible, so
+# a seller whose reserve is 40 rejected 100, 110, 115, 118 and 119 in a row
+# rather than close (see the smoke run in this file's history). A deadline gives
+# both sides a reason to converge. It is the same number in all three
+# conditions, so it does not touch the independent variable.
 COMMON = (
     " Four acts are available: propose (offer a price), accept-proposal (agree to "
     "the other side's last price, which ends the negotiation with a deal), "
     "reject-proposal (decline the last price and keep negotiating), refuse (leave "
     "the negotiation for good, no deal). Every message you send is exactly one of "
     "these four acts. Send accept-proposal only in reply to a price the other side "
-    "has already named."
+    "has already named. When you do not accept the other side's price but still "
+    "want to trade, reply with propose and your own price: reject-proposal "
+    "carries no price, so a counter-offer has to be a propose. The negotiation "
+    "stops after {max_turns} messages in total, counting both sides; if nobody "
+    "has accepted by then there is no deal and neither of you gets anything."
 )
 
 # The one paragraph that changes. Verbatim from the lecture notes.
@@ -85,6 +92,13 @@ READER_SYSTEM = (
 )
 
 
-def system_prompt(role: str, item: str, limit: int, condition: str) -> str:
-    """role is 'buyer' or 'seller'; condition is 'free', 'tagged' or 'structured'."""
-    return ROLE[role].format(item=item, limit=limit) + COMMON + FORMAT[condition]
+def system_prompt(role: str, item: str, limit: int, condition: str,
+                  max_turns: int) -> str:
+    """role is 'buyer' or 'seller'; condition is 'free', 'tagged' or 'structured'.
+
+    FORMAT is not passed through .format(): the structured paragraph is JSON and
+    its braces have to survive.
+    """
+    return (ROLE[role].format(item=item, limit=limit)
+            + COMMON.format(max_turns=max_turns)
+            + FORMAT[condition])

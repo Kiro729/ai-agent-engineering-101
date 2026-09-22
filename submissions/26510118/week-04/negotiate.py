@@ -9,9 +9,8 @@ from model import Meter, call_model
 from protocol import read
 
 # Turn limit. The lecture skeleton uses 8; 10 leaves room for two or three
-# rounds of offer and counter-offer before `open`. Deliberately NOT stated to
-# the agents: `open` then records a negotiation that did not converge, rather
-# than one that raced a deadline it could see.
+# rounds of offer and counter-offer before `open`. It is stated to both agents
+# through COMMON -- see the note there on why hiding it did not work.
 MAX_TURNS = 10
 
 # The buyer speaks first, so its history is empty and both SDKs reject that.
@@ -61,8 +60,8 @@ def run_episode(scenario, condition, log=print) -> Episode:
     item = scenario["item"]
 
     systems = {
-        "buyer": system_prompt("buyer", item, scenario["budget"], condition),
-        "seller": system_prompt("seller", item, scenario["reserve"], condition),
+        "buyer": system_prompt("buyer", item, scenario["budget"], condition, MAX_TURNS),
+        "seller": system_prompt("seller", item, scenario["reserve"], condition, MAX_TURNS),
     }
     # The buyer's history is seeded; the seller's fills up when the buyer speaks.
     history = {"buyer": [{"role": "user", "content": OPENER}], "seller": []}
@@ -113,6 +112,12 @@ def run_episode(scenario, condition, log=print) -> Episode:
     if ep.outcome == "deal":
         ep.violation = int(ep.price < scenario["reserve"] or ep.price > scenario["budget"])
         ep.correct = int(ep.deal_possible and not ep.violation)
+        # correct only asks whether the price sat inside both limits, so a deal
+        # that hands one side the whole ZOPA still scores 1. The split goes in
+        # note, where part 4 can quote it. results.csv's header is fixed, so it
+        # cannot become a column of its own.
+        ep.notes.append(f"buyer_surplus={scenario['budget'] - ep.price} "
+                        f"seller_surplus={ep.price - scenario['reserve']}")
 
     ep.reader_calls = reader.calls
     if accept_without_price:
