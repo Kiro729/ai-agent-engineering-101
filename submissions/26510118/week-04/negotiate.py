@@ -14,10 +14,15 @@ from protocol import read
 MAX_TURNS = 10
 
 # The buyer speaks first, so its history is empty and both SDKs reject that.
-# One neutral turn seeds it. It must stay neutral: "make your opening offer"
-# would decide for the buyer how to open, and whether the buyer opens with a
-# question is one of the things this lab measures.
-OPENER = "Begin."
+# One turn seeds it.
+#
+# A neutral "Begin." was tried first. The buyer then opened with a question --
+# "what is your asking price?" -- which none of the four acts covers, the reader
+# labelled it refuse or an empty propose, and the episode died at turn 1. The
+# README expects that and calls it data, but it spends whole episodes on one
+# known artefact, so the opener now asks for an opening offer instead. It is the
+# same string in all three conditions.
+OPENER = "Begin the negotiation by making your opening offer."
 
 
 class Episode:

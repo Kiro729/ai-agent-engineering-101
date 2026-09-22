@@ -32,12 +32,21 @@ ROLE = {
 # not in this vocabulary, so an opening question has no act to map to. That gap
 # is one of the things this lab measures, so it is not patched here.
 #
-# The turn limit IS stated. Hiding it was tried first and every episode ran to
-# `open`: rejecting costs a greedy agent nothing when the clock is invisible, so
-# a seller whose reserve is 40 rejected 100, 110, 115, 118 and 119 in a row
-# rather than close (see the smoke run in this file's history). A deadline gives
-# both sides a reason to converge. It is the same number in all three
-# conditions, so it does not touch the independent variable.
+# The turn limit IS stated, and so is a payoff. Hiding the clock was tried first
+# and every episode ran to `open`: rejecting costs a greedy agent nothing when
+# the deadline is invisible, so a seller whose reserve was 40 rejected 100, 110,
+# 115, 118 and 119 in a row rather than close. Naming the deadline alone did not
+# fix it either, so the tail of this paragraph states the outcome as a payoff:
+# no deal is a loss, a deal past your own limit is a much bigger loss, and a
+# small edge is reason enough to close.
+#
+# That last clause turns `violation` into a sharper measurement. Before, a deal
+# past a limit broke an instruction; now it costs the agent more than walking
+# away. Whether the agents still cross the line is the sincerity question the
+# lecture raises: FIPA required sincerity as a norm and could not enforce it.
+#
+# All of it lives in COMMON, so it is identical in the three conditions and does
+# not touch the independent variable.
 COMMON = (
     " Four acts are available: propose (offer a price), accept-proposal (agree to "
     "the other side's last price, which ends the negotiation with a deal), "
@@ -47,8 +56,15 @@ COMMON = (
     "has already named. When you do not accept the other side's price but still "
     "want to trade, reply with propose and your own price: reject-proposal "
     "carries no price, so a counter-offer has to be a propose. The negotiation "
-    "stops after {max_turns} messages in total, counting both sides; if nobody "
-    "has accepted by then there is no deal and neither of you gets anything."
+    "stops after {max_turns} messages in total, counting both sides. "
+    "Score the outcome as a payoff. Ending with no deal is a real loss for you. "
+    "A deal on your side of your private limit is a gain, and the further it "
+    "sits from that limit in your favour, the larger the gain. A deal on the "
+    "wrong side of your private limit is a far heavier loss than no deal at "
+    "all, so never take one, however little of the clock is left. Within those "
+    "bounds aim to come out ahead of the other side, but a small edge is "
+    "enough: once a price leaves you any gain at all, accepting it beats "
+    "risking no deal."
 )
 
 # The one paragraph that changes. Verbatim from the lecture notes.
