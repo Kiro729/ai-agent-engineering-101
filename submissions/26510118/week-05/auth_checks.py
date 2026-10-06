@@ -90,16 +90,15 @@ def main() -> int:
     lines.append(f'2. buyer token of {a["negotiation_id"]} on '
                  f'{b["negotiation_id"]} -> tool error: {tool_text(body)}')
 
-    # 3 -- the seller opens, so the buyer moving first is out of turn.
-    _, _, body = rpc(a["buyer_token"], "propose",
-                     {"negotiation_id": a["negotiation_id"], "price": 90})
-    lines.append(f'3. buyer moves before the seller has -> tool error: {tool_text(body)}')
+    # 3 -- the item is listed when the negotiation opens and the buyer answers
+    # it, so the seller moving first is out of turn.
+    _, _, body = rpc(a["seller_token"], "propose",
+                     {"negotiation_id": a["negotiation_id"], "price": 125})
+    lines.append(f'3. seller moves before the buyer has -> tool error: {tool_text(body)}')
 
-    # 4 -- the buyer's limit is 100 and this is a server condition. The turn
-    # is checked before the limit, so the seller takes its opening move first
-    # and this is a refusal about the limit and nothing else.
-    rpc(a["seller_token"], "propose",
-        {"negotiation_id": a["negotiation_id"], "price": 120})
+    # 4 -- the buyer's limit is 100 and this is a server condition. The buyer
+    # is on turn from the start, so this refusal is about the limit and
+    # nothing else.
     _, _, body = rpc(a["buyer_token"], "propose",
                      {"negotiation_id": a["negotiation_id"], "price": 130})
     lines.append(f'4. server_inject, buyer (limit 100) proposes 130 -> '
