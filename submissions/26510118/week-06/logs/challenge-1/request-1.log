@@ -1,0 +1,20 @@
+request: something wooden to keep about 40 books, not taller than my desk
+budget: 260
+
+[buyer] shopping for something wooden to keep about 40 books, not taller than my desk, budget 260, at http://127.0.0.1:57249
+[buyer] card: 'Kiro Furniture' via JSONRPC http://127.0.0.1:57249/
+[buyer] skills: ['negotiate']
+[buyer] -> 'I want to buy a something wooden to keep about 40 books, not taller than my desk'
+[buyer] <- TASK_STATE_INPUT_REQUIRED | The Rustic Walnut Bookshelf is 499
+[buyer] ask 499 budget 260 round 1: harness '200' -> 200
+[buyer] -> '200' taskId=e020bbd3
+[buyer] <- TASK_STATE_INPUT_REQUIRED | Too low at 200. The Rustic Walnut Bookshelf is 400
+[buyer] ask 400 budget 260 round 2: harness '250' -> 250
+[buyer] -> '250' taskId=e020bbd3
+[buyer] <- TASK_STATE_INPUT_REQUIRED | Too low at 250. The Rustic Walnut Bookshelf is 339
+[buyer] ask 339 budget 260 round 3: harness '255' -> 255
+[buyer] -> '255' taskId=e020bbd3
+[buyer] <- TASK_STATE_INPUT_REQUIRED | Too low at 255. The Rustic Walnut Bookshelf is 339
+[buyer] 339 is over 260 and not moving; leaving
+[buyer] no deal (TASK_STATE_INPUT_REQUIRED)
+[harness] 3 call(s), 0 failed, 45s total

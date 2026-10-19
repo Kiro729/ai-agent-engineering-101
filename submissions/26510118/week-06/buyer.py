@@ -89,10 +89,18 @@ def choose(item: str, budget: int, ask, rounds: int, hist, stalled: bool):
     if within and rounds >= MAX_ROUNDS:
         log(f"[buyer] last round and {ask} fits {budget}; taking it")
         return "accept", ask
-    if not within and (stalled or rounds >= MAX_ROUNDS):
-        log(f"[buyer] {ask} is over {budget} and "
-            + ("not moving" if stalled else "the clock is out") + "; leaving")
+    if not within and stalled:
+        log(f"[buyer] {ask} is over {budget} and not moving; leaving")
         return "walk", None
+    if not within and rounds >= MAX_ROUNDS:
+        # Last round, still above budget, but the shop is still coming down.
+        # Leaving now wastes the round: an offer at the limit costs nothing
+        # and the other side may be on its own last round too. A sofa was
+        # lost exactly here -- the shop was asking 710 against a reserve of
+        # 605 and would have taken 700 (logs/challenge-1/request-2.log).
+        log(f"[buyer] last round and {ask} is over {budget}; "
+            f"putting the full {budget} on the table")
+        return "offer", budget
 
     rule = int(budget * LADDER[min(rounds - 1, len(LADDER) - 1)])
     spent = time.time() - _START

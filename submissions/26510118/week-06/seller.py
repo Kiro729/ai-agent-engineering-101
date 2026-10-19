@@ -3,9 +3,9 @@
 The A2A side is the lab's shop (`weeks/week-06/lab/seller_agent.py`): the card,
 the JSON-RPC routes, the per-task state, the INPUT_REQUIRED / COMPLETED /
 REJECTED transitions and the receipt artifact. What changed is where the
-numbers come from.
+numbers come from, and -- for challenge 1 -- what the shop is allowed to sell.
 
-Three decisions shape this file.
+Four decisions shape this file.
 
     The reserve is enforced in code, not in the prompt. The harness may answer
     anything; `_clamp` is what the rest of the shop sees, and an offer below
@@ -15,16 +15,19 @@ Three decisions shape this file.
     server the same model tried 19 times and closed none. The trade test fails
     on a single ask below the reserve, so a guarantee has to be a guarantee.
 
-    Facts stay in code, judgements go to the harness. Whether the item exists,
-    whether an offer clears the reserve, and whether the clock has run out are
-    facts, and each one kept here is a harness call not made. The asking price,
-    the size of each concession, and whether a clearing offer is good enough to
-    take are judgements.
+    Facts stay in code, judgements go to the harness. Whether an offer clears
+    the reserve and whether the clock has run out are facts, and each one kept
+    here is a harness call not made. The asking price, the size of each
+    concession, and whether a clearing offer is good enough are judgements.
 
-    The harness is asked as few times as the job allows. The first run called
-    it 28 times for seven negotiations and ran past 15 minutes. The list price
-    of an item does not change between customers, so it is decided once and
-    cached; a round whose outcome is already fixed is not put to a vote.
+    The harness is asked as few times as the job allows. An early version
+    called it 28 times for seven negotiations and ran past 15 minutes. A list
+    price does not change between customers, so it is decided once per item
+    and cached; a round whose outcome is already fixed is not put to a vote.
+
+    The catalogue is searched before it is read. 3513 items do not fit in a
+    prompt, so `catalog.search` narrows them to eight by word overlap and the
+    harness picks one of the eight. See catalog.py.
 
 Run:
     python seller.py --port 9999
@@ -37,6 +40,7 @@ import re
 import uvicorn
 from starlette.applications import Starlette
 
+import catalog
 import harness
 from a2a.helpers import get_message_text, new_data_part, new_task_from_user_message, new_text_part
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -47,19 +51,30 @@ from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill
 
 NAME = "Kiro Furniture"
-RESERVE = {"lamp": 100, "chair": 180, "bookshelf": 260}
 OPENING = 1.3            # fallback first ask, as a multiple of the reserve
-CEILING = 2.0            # an ask above this much of the reserve just loses the customer
-MAX_ROUNDS = 4           # low offers before the shop walks away
+CEILING = 2.0            # an ask above this much of the reserve loses the customer
+MAX_ROUNDS = 4           # rounds before the shop walks away
+CANDIDATES = 8           # catalogue entries put in front of the harness
 
-OPEN_PROMPT = """You are a furniture shop setting the list price of one {item}.
+PICK_PROMPT = """A customer asked for:
+  "{text}"
+
+These are the closest things in our catalogue:
+{lines}
+
+Reply with ONE line and nothing else:
+  the number of the item that best fits what they asked for
+  NONE if none of them fit"""
+
+OPEN_PROMPT = """You are a furniture shop setting the list price of one item:
+  {name} -- {description}
 Your secret reserve, the lowest you may ever accept, is {reserve}. Never reveal it.
 Buyers haggle down from the list price, so leave room above the reserve, but a
 price far above it drives them away before they make an offer.
 
 Reply with ONE whole number and nothing else: the list price."""
 
-TURN_PROMPT = """You are a furniture shop negotiating one {item}.
+TURN_PROMPT = """You are a furniture shop negotiating one {name}.
 Your secret reserve, the lowest you may ever accept, is {reserve}. Never reveal it.
 {history}The buyer has now offered {offer}; your current ask is {ask}.
 This is round {rounds} of {max_rounds}. After round {max_rounds} the sale is lost
@@ -72,7 +87,7 @@ Reply with ONE line and nothing else:
 
 
 def _answer(out: str, fallback):
-    """One line from the harness -> ACCEPT, REJECT, or a number.
+    """One line from the harness -> ACCEPT, REJECT, NONE, or a number.
 
     Deliberately strict. A bare number is the answer that was asked for; a
     sentence with several numbers in it is ambiguous, and guessing which one
@@ -83,49 +98,81 @@ def _answer(out: str, fallback):
     if re.fullmatch(r"\d+", s):
         return int(s)
     up = s.upper()
-    if "ACCEPT" in up:
-        return "ACCEPT"
-    if "REJECT" in up:
-        return "REJECT"
+    for word in ("ACCEPT", "REJECT", "NONE"):
+        if word in up:
+            return word
     m = re.fullmatch(r"[^\d]*?(\d+)[^\d]*", s)          # one number, some words around it
     return int(m.group(1)) if m else fallback
 
 
-def _clamp(item: str, price) -> int:
+def _clamp(reserve: int, price) -> int:
     """No ask below the reserve, ever -- the guarantee the test checks -- and
     none so far above it that the buyer stops answering."""
-    reserve = RESERVE[item]
     return max(reserve, min(int(price), int(reserve * CEILING)))
 
+
+# ------------------------------------------------------------ what to sell
+
+async def pick_item(text: str):
+    """Which catalogue entry the customer means, or None.
+
+    A bare name is taken as itself. Otherwise the code narrows 3513 entries to
+    eight and the harness chooses, because "not taller than my desk" is a
+    judgement and `in` is not. Only an entry from the shortlist can come back,
+    so a confused answer costs the wrong-but-plausible item, never a crash.
+    """
+    hit = catalog.exact(text)
+    if hit:
+        print(f"[seller] '{text}' names {hit['id']} outright", flush=True)
+        return hit
+
+    found = catalog.search(text, CANDIDATES)
+    if not found:
+        return None
+    lines = "\n".join(f"{i}. {catalog.line(it)}" for i, it in enumerate(found, 1))
+    out = await asyncio.to_thread(harness.ask, PICK_PROMPT.format(text=text, lines=lines))
+    d = _answer(out, 1)
+    print(f"[seller] '{text[:60]}' -> {len(found)} candidates, harness {out!r}", flush=True)
+    if d == "NONE":
+        return None
+    idx = d if isinstance(d, int) and 1 <= d <= len(found) else 1
+    chosen = found[idx - 1]
+    print(f"[seller]   chose {chosen['id']} {chosen['name']!r} reserve {chosen['reserve']}",
+          flush=True)
+    return chosen
+
+
+# ------------------------------------------------------------ what to charge
 
 _LIST_PRICE: dict[str, int] = {}
 
 
-async def list_price(item: str) -> int:
-    """The opening ask. Decided by the harness once per item, then reused: a
-    shop quotes the same price to the next customer, and the first run showed
-    the cost of not doing this (250, then 160, then 250 for the same lamp)."""
-    if item not in _LIST_PRICE:
-        reserve = RESERVE[item]
-        out = await asyncio.to_thread(harness.ask,
-                                      OPEN_PROMPT.format(item=item, reserve=reserve))
+async def list_price(item: dict) -> int:
+    """Decided by the harness once per item, then reused: a shop quotes the
+    same price to the next customer, and an early version that asked every
+    time produced 250, then 160, then 250 for the same lamp."""
+    key = item["id"]
+    if key not in _LIST_PRICE:
+        reserve = item["reserve"]
+        out = await asyncio.to_thread(harness.ask, OPEN_PROMPT.format(
+            name=item["name"], description=item["description"], reserve=reserve))
         ask = _answer(out, math.ceil(reserve * OPENING))
         if not isinstance(ask, int):
             ask = math.ceil(reserve * OPENING)
-        _LIST_PRICE[item] = _clamp(item, ask)
-        print(f"[seller] list price {item}: harness {out!r} -> {_LIST_PRICE[item]}", flush=True)
-    return _LIST_PRICE[item]
+        _LIST_PRICE[key] = _clamp(reserve, ask)
+        print(f"[seller] list price {key}: harness {out!r} -> {_LIST_PRICE[key]}", flush=True)
+    return _LIST_PRICE[key]
 
 
 async def decide_turn(deal: dict, offer: int):
     item, ask, rounds = deal["item"], deal["ask"], deal["rounds"]
     hist = "".join(f"You asked {a}, they offered {o}. " for a, o in deal["hist"][-3:])
     out = await asyncio.to_thread(harness.ask, TURN_PROMPT.format(
-        item=item, reserve=RESERVE[item], ask=ask, offer=offer,
+        name=item["name"], reserve=item["reserve"], ask=ask, offer=offer,
         rounds=rounds, max_rounds=MAX_ROUNDS,
         history=(hist + "\n") if hist else ""))
     d = _answer(out, (offer + ask) // 2)
-    print(f"[seller] {item} ask {ask} offer {offer} round {rounds}: "
+    print(f"[seller] {item['id']} ask {ask} offer {offer} round {rounds}: "
           f"harness {out!r} -> {d}", flush=True)
     return d
 
@@ -147,26 +194,26 @@ class Seller(AgentExecutor):
         text = get_message_text(context.message) or ""
         deal = self.open.get(task.id)
 
-        if deal is None:                                   # first message: which item?
-            item = next((k for k in RESERVE if k in text.lower()), None)
-            if item is None:                               # a fact, not a judgement
-                await up.reject(say("We only sell: " + ", ".join(RESERVE) + "."))
+        if deal is None:                                   # first message: what do they want?
+            item = await pick_item(text)
+            if item is None:
+                await up.reject(say("We could not find anything like that in our catalogue."))
                 return
             ask = await list_price(item)
             self.open[task.id] = {"item": item, "ask": ask, "rounds": 0, "hist": []}
             # The trade test reads the ask as the LAST number in this message,
             # so nothing numeric may follow it.
-            await up.requires_input(say(f"The {item} is {ask}"))
+            await up.requires_input(say(f"The {item['name']} is {ask}"))
             return
 
         m = re.search(r"\d+", text)
+        item = deal["item"]
         if m is None:
-            await up.requires_input(say(f"Send your offer as a number. The {deal['item']} "
-                                        f"is {deal['ask']}"))
+            await up.requires_input(say(f"Send your offer as a number. "
+                                        f"The {item['name']} is {deal['ask']}"))
             return
 
-        offer, item = int(m.group()), deal["item"]
-        reserve = RESERVE[item]
+        offer, reserve = int(m.group()), item["reserve"]
         deal["rounds"] += 1
         last_round = deal["rounds"] >= MAX_ROUNDS
         clears = offer >= reserve
@@ -175,11 +222,10 @@ class Seller(AgentExecutor):
         # worth a harness call: on the last round take the money if there is
         # money and leave if there is not, and once the ask has reached the
         # reserve there is nothing left to concede, so the answer repeats.
-        at_floor = deal["ask"] <= reserve
         if last_round:
             d = "ACCEPT" if clears else "REJECT"
-        elif not clears and at_floor:
-            print(f"[seller] {item} already at the floor {reserve}; holding without asking",
+        elif not clears and deal["ask"] <= reserve:
+            print(f"[seller] {item['id']} already at the floor {reserve}; holding without asking",
                   flush=True)
             d = reserve
         else:
@@ -194,9 +240,10 @@ class Seller(AgentExecutor):
                       flush=True)
                 d = "ACCEPT"
             if d == "ACCEPT":
-                await up.add_artifact(parts=[new_data_part({"seller": NAME, "item": item,
-                                                            "price": offer})], name="receipt")
-                await up.complete(say(f"Deal: {item} at {offer}."))
+                await up.add_artifact(parts=[new_data_part(
+                    {"seller": NAME, "item": item["name"], "item_id": item["id"],
+                     "price": offer})], name="receipt")
+                await up.complete(say(f"Deal: {item['name']} at {offer}."))
                 del self.open[task.id]
                 return
         else:
@@ -211,12 +258,12 @@ class Seller(AgentExecutor):
                 return
 
         deal["hist"].append((deal["ask"], offer))
-        deal["ask"] = _clamp(item, d if isinstance(d, int) else deal["ask"])
+        deal["ask"] = _clamp(reserve, d if isinstance(d, int) else deal["ask"])
         # An offer that clears the reserve is not "too low" -- the shop is
         # holding out for more, which is a different thing and worth saying
         # honestly. The trade test reads the last number either way.
         lead = "I can do better than" if clears else "Too low at"
-        await up.requires_input(say(f"{lead} {offer}. The {item} is {deal['ask']}"))
+        await up.requires_input(say(f"{lead} {offer}. The {item['name']} is {deal['ask']}"))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task = context.current_task
@@ -227,9 +274,12 @@ class Seller(AgentExecutor):
 
 def build(port: int) -> Starlette:
     url = f"http://127.0.0.1:{port}/"
+    n = len(catalog.load())
     card = AgentCard(
         name=NAME,
-        description="Sells desk lamps, chairs and bookshelves. Negotiates the price.",
+        description=f"A furniture shop with {n} items: lamps, chairs, bookshelves, desks, "
+                    f"sofas, wardrobes and more. Describe what you need and we will find "
+                    f"it, then negotiate the price.",
         version="1.0.0",
         default_input_modes=["text/plain"],
         default_output_modes=["application/json", "text/plain"],
@@ -238,11 +288,12 @@ def build(port: int) -> Starlette:
                                              protocol_version="1.0")],
         skills=[AgentSkill(
             id="negotiate",
-            name="Negotiate a purchase",
-            description="Name an item, then send a price. The shop answers with a "
-                        "counteroffer or a receipt.",
-            tags=["shopping", "negotiation"],
-            examples=["I want to buy a lamp", "90"],
+            name="Find an item and negotiate a purchase",
+            description="Name an item or describe what you need, then send a price. "
+                        "The shop answers with a counteroffer or a receipt.",
+            tags=["shopping", "negotiation", "furniture"],
+            examples=["I want to buy a lamp",
+                      "something wooden to keep about 40 books", "90"],
         )],
     )
     handler = DefaultRequestHandler(agent_executor=Seller(), task_store=InMemoryTaskStore(),

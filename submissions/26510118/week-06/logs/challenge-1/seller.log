@@ -1,0 +1,31 @@
+[seller] 'I want to buy a something wooden to keep about 40 books, not' -> 8 candidates, harness '7'
+[seller]   chose itm-00024 'Rustic Walnut Bookshelf' reserve 339
+[seller] list price itm-00024: harness '499' -> 499
+[seller] itm-00024 ask 499 offer 200 round 1: harness '400' -> 400
+[harness] call failed (TimeoutExpired) after 51s; falling back
+[seller] itm-00024 ask 400 offer 250 round 2: harness '' -> 325
+[seller] itm-00024 already at the floor 339; holding without asking
+[seller] 'I want to buy a a comfy seat for two people in the living ro' -> 8 candidates, harness '2'
+[seller]   chose itm-01186 'Farmhouse Oak Sofa' reserve 605
+[seller] list price itm-01186: harness '850' -> 850
+[seller] itm-01186 ask 850 offer 550 round 1: harness '750' -> 750
+[seller] itm-01186 ask 750 offer 665 round 2: harness '700' -> 700
+[seller] itm-01186 ask 700 offer 700 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] 'I want to buy a a tall mirror for the hallway' -> 8 candidates, harness '2'
+[seller]   chose itm-02366 'Industrial Walnut Mirror' reserve 167
+[seller] list price itm-02366: harness '245' -> 245
+[seller] itm-02366 ask 245 offer 210 round 1: harness '230' -> 230
+[seller] itm-02366 ask 230 offer 220 round 2: harness '225' -> 225
+[seller] itm-02366 ask 225 offer 223 round 3: harness '224' -> 224
+[seller] 'I want to buy a a small bedside table in pale wood' -> 8 candidates, harness '6'
+[seller]   chose itm-03048 'Rustic Oak Nightstand' reserve 133
+[seller] list price itm-03048: harness '189' -> 189
+[seller] itm-03048 ask 189 offer 155 round 1: harness '170' -> 170
+[seller] itm-03048 ask 170 offer 162 round 2: harness '165' -> 165
+[seller] itm-03048 ask 165 offer 163 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] 'I want to buy a a rattan stool for the kitchen' -> 8 candidates, harness '1'
+[seller]   chose itm-01982 'Modern Rattan Stool' reserve 58
+[seller] list price itm-01982: harness '78' -> 78
+[seller] itm-01982 ask 78 offer 65 round 1: harness '72' -> 72
+[seller] itm-01982 ask 72 offer 69 round 2: harness '71' -> 71
+[seller] itm-01982 ask 71 offer 70 round 3: harness 'ACCEPT' -> ACCEPT
