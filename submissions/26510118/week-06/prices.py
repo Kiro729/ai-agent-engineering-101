@@ -111,6 +111,30 @@ def check_receipt(artifacts, offered: int, expect_item: str | None = None):
         return price, f"receipt price {price} is not positive"
     if price > offered:
         return price, f"receipt price {price} is above the {offered} that was offered"
-    if expect_item and item and expect_item.lower() not in str(item).lower():
+    want = _words(expect_item)
+    # Only a buyer that named the item can check the name. One that described
+    # what it wanted cannot: "a small bedside table in pale wood" is correctly
+    # answered with a "Rustic Oak Nightstand", and the catalogue that connects
+    # the two belongs to the shop. Checking anyway rejected four correct
+    # purchases in challenge 1. Two content words or fewer is a name.
+    if 0 < len(want) <= 2 and item and not (want & _words(item)):
         return price, f"receipt is for {item!r}, not {expect_item!r}"
     return price, None
+
+
+_SKIP = {"the", "for", "and", "with", "that", "this", "from", "your", "our", "one",
+         "some", "any", "about", "not", "than", "want", "buy", "need"}
+
+
+def _words(s: str) -> set:
+    """Content words, for comparing a receipt against what was asked for.
+
+    Substring matching was the first attempt and it broke challenge 1: a buyer
+    that describes what it wants ("a tall mirror for the hallway") is sold a
+    named item ("Classic Pine Mirror"), and the two strings do not contain one
+    another even though the shop sent exactly the right thing. One shared word
+    is enough to say the receipt is about the same purchase, and it still
+    catches a receipt for a stool against a request for a lamp.
+    """
+    return {w for w in re.findall(r"[a-z]+", (s or "").lower())
+            if len(w) > 2 and w not in _SKIP}

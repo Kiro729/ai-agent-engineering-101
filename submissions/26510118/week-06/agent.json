@@ -1,5 +1,5 @@
 {
-  "harness": "Claude Code CLI (claude -p), model claude-haiku-4-5",
+  "harness": "Claude Code CLI 2.1.268 (claude -p), model claude-sonnet-5",
   "seller": {
     "cmd": "python seller.py --port {port}"
   },

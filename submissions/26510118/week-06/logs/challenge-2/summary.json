@@ -7,53 +7,53 @@
     "mirror": "a mirror for the hallway"
   },
   "tightness": 0.88,
-  "budget": 694,
+  "budget": 658,
   "cheapest_asks": {
-    "lamp": 70,
-    "bookshelf": 499,
-    "stool": 75,
-    "mirror": 145
+    "lamp": 72,
+    "bookshelf": 429,
+    "stool": 72,
+    "mirror": 175
   },
   "caps": {
-    "lamp": 62,
-    "bookshelf": 437,
-    "stool": 66,
-    "mirror": 129
+    "lamp": 63,
+    "bookshelf": 377,
+    "stool": 63,
+    "mirror": 155
   },
   "bought": {
     "lamp": {
       "shop": "Lumen Lighting",
-      "price": 62.0
+      "price": 59.0
     },
     "bookshelf": {
       "shop": "Shelf Life",
-      "price": 437.0
-    },
-    "mirror": {
-      "shop": "Reflections",
-      "price": 129.0
+      "price": 320.0
     },
     "stool": {
       "shop": "Nordic Seating",
-      "price": 66.0
+      "price": 57.0
+    },
+    "mirror": {
+      "shop": "Reflections",
+      "price": 138.0
     }
   },
-  "spent": 694.0,
+  "spent": 574.0,
   "all_items_bought": true,
   "within_budget": true,
   "receipts": [
     "lamp",
     "bookshelf",
-    "mirror",
-    "stool"
+    "stool",
+    "mirror"
   ],
   "no_duplicates": true,
-  "harness_calls": 14,
+  "harness_calls": 17,
   "harness_failed": 0,
   "prompt_chars": {
-    "calls": 14,
+    "calls": 17,
     "min": 577,
-    "max": 762,
+    "max": 741,
     "mean": 720
   }
 }

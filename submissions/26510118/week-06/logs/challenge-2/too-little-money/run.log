@@ -22,88 +22,99 @@
 
 ## quotes
   lamp: shortlist ['Northlight Studio', 'Lumen Lighting', 'Bedside Manner']
-    Northlight Studio  The Modern Birch Lamp is 89
-    Lumen Lighting     The Modern Birch Lamp is 79
-    Bedside Manner     The Modern Birch Lamp is 87
+    Northlight Studio  The Modern Birch Lamp is 85
+    Lumen Lighting     The Modern Birch Lamp is 72
+    Bedside Manner     The Modern Birch Lamp is 82
   bookshelf: shortlist ['Shelf Life', 'Paper and Pine', 'The Book Nook']
-    Shelf Life         The Industrial Walnut Bookshelf is 450
-    Paper and Pine     The Industrial Walnut Bookshelf is 450
-    The Book Nook      The Industrial Walnut Bookshelf is 520
+    Shelf Life         The Industrial Walnut Bookshelf is 425
+    Paper and Pine     The Industrial Walnut Bookshelf is 449
+    The Book Nook      The Industrial Walnut Bookshelf is 525
   stool: shortlist ['Kitchen Common', 'Nordic Seating', 'Low Table Co']
-    Kitchen Common     The Classic Birch Stool is 68
-    Nordic Seating     The Classic Birch Stool is 85
+    Kitchen Common     The Classic Birch Stool is 78
+    Nordic Seating     The Classic Birch Stool is 75
     Low Table Co       The Classic Birch Stool is 85
   mirror: shortlist ['Hall and Entry', 'Lumen Lighting', 'Reflections']
-    Hall and Entry     The Modern Pine Mirror is 150
-    Lumen Lighting     The Industrial Oak Mirror is 220
-    Reflections        The Industrial Oak Mirror is 185
+    Hall and Entry     The Industrial Oak Mirror is 199
+    Lumen Lighting     The Industrial Oak Mirror is 185
+    Reflections        The Industrial Oak Mirror is 165
 
-## budget 448 = 747 (cheapest asks) x 0.6
-   caps {'lamp': 47, 'bookshelf': 270, 'stool': 41, 'mirror': 90}
+## budget 442 = 737 (cheapest asks) x 0.6
+   caps {'lamp': 43, 'bookshelf': 255, 'stool': 45, 'mirror': 99}
 
 ## round 1: ['lamp', 'bookshelf', 'stool', 'mirror']
-BUDGET 448, spent 0, left 448
+BUDGET 442, spent 0, left 442
 
   item       shop                 ask  my last  round  state
-  lamp       Lumen Lighting        79        -      0  OPEN
-  bookshelf  Shelf Life           450        -      0  OPEN
-  stool      Kitchen Common        68        -      0  OPEN
-  mirror     Hall and Entry       150        -      0  OPEN
-   lamp: harness '47' -> offer 47 (cap 47)
-   bookshelf: harness '200' -> offer 200 (cap 270)
-   stool: harness '41' -> offer 41 (cap 41)
-   mirror: harness '80' -> offer 80 (cap 90)
-   lamp: bought at 47.0, spent 47.0/448
+  lamp       Lumen Lighting        72        -      0  OPEN
+  bookshelf  Shelf Life           425        -      0  OPEN
+  stool      Nordic Seating        75        -      0  OPEN
+  mirror     Reflections          165        -      0  OPEN
+   lamp: harness '30' -> offer 30 (cap 43)
+   bookshelf: harness '150' -> offer 150 (cap 255)
+   stool: harness '35' -> offer 35 (cap 45)
+   mirror: harness '55' -> offer 55 (cap 99)
 
-## round 2: ['bookshelf', 'stool', 'mirror']
-BUDGET 448, spent 47.0, left 401.0
-
-  item       shop                 ask  my last  round  state
-  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
-  bookshelf  Shelf Life           360      200      1  OPEN
-  stool      Kitchen Common        58       41      1  OPEN
-  mirror     Hall and Entry       125       80      1  OPEN
-   bookshelf: harness '250' -> offer 250 (cap 270.0)
-   stool: harness '41' -> offer 41 (cap 41.0)
-   mirror: harness '90' -> offer 90 (cap 90.0)
-   mirror: bought at 90.0, spent 137.0/448
-
-## round 3: ['bookshelf', 'stool']
-BUDGET 448, spent 137.0, left 311.0
+## round 2: ['lamp', 'bookshelf', 'stool', 'mirror']
+BUDGET 442, spent 0, left 442
 
   item       shop                 ask  my last  round  state
-  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
-  bookshelf  Shelf Life           310      250      2  OPEN
-  stool      Kitchen Common        54       41      2  OPEN
-  mirror     Hall and Entry         -        -      2  BOUGHT at 90.0
-   bookshelf: harness '265' -> offer 265 (cap 270.0)
-   stool: harness '41' -> offer 41 (cap 41.0)
+  lamp       Lumen Lighting        63       30      1  OPEN
+  bookshelf  Shelf Life           390      150      1  OPEN
+  stool      Nordic Seating        65       35      1  OPEN
+  mirror     Reflections          145       55      1  OPEN
+   lamp: harness '40' -> offer 40 (cap 43)
+   bookshelf: harness '180' -> offer 180 (cap 255)
+   stool: harness '40' -> offer 40 (cap 45)
+   mirror: harness '65' -> offer 65 (cap 99)
 
-## round 4: ['bookshelf', 'stool']
-BUDGET 448, spent 137.0, left 311.0
+## round 3: ['lamp', 'bookshelf', 'stool', 'mirror']
+BUDGET 442, spent 0, left 442
 
   item       shop                 ask  my last  round  state
-  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
-  bookshelf  Shelf Life           295      265      3  OPEN
-  stool      Kitchen Common        52       41      3  OPEN
-  mirror     Hall and Entry         -        -      2  BOUGHT at 90.0
-   bookshelf: harness '260' -> offer 260 (cap 270.0)
-   stool: harness '41' -> offer 41 (cap 41.0)
+  lamp       Lumen Lighting        55       40      2  OPEN
+  bookshelf  Shelf Life           340      180      2  OPEN
+  stool      Nordic Seating        58       40      2  OPEN
+  mirror     Reflections          130       65      2  OPEN
+   lamp: harness '45' -> offer 43 (cap 43)
+   bookshelf: harness '200' -> offer 200 (cap 255)
+   stool: harness '42' -> offer 42 (cap 45)
+   mirror: harness '75' -> offer 75 (cap 99)
 
-## settle bookshelf: 311.0 left
-   bookshelf: trying Paper and Pine, asking 450
-   bookshelf: trying The Book Nook, asking 520
+## round 4: ['lamp', 'bookshelf', 'stool', 'mirror']
+BUDGET 442, spent 0, left 442
+
+  item       shop                 ask  my last  round  state
+  lamp       Lumen Lighting        49       43      3  OPEN
+  bookshelf  Shelf Life           310      200      3  OPEN
+  stool      Nordic Seating        51       42      3  OPEN
+  mirror     Reflections          118       75      3  OPEN
+   lamp: harness '45' -> offer 43 (cap 43)
+   bookshelf: harness '220' -> offer 220 (cap 255)
+   stool: harness '44' -> offer 44 (cap 45)
+   mirror: harness '85' -> offer 85 (cap 99)
+
+## settle lamp: 442 left
+   lamp: trying Bedside Manner, asking 108
+   lamp: bought at 108.0 from Bedside Manner, spent 108.0/442
+
+## settle bookshelf: 334.0 left
+   bookshelf: trying Paper and Pine, asking 449
+   bookshelf: trying The Book Nook, asking 525
    bookshelf: no shop left to try
 
-## settle stool: 311.0 left
-   stool: trying Nordic Seating, asking 85
-   stool: bought at 85.0 from Nordic Seating, spent 222.0/448
+## settle stool: 334.0 left
+   stool: trying Kitchen Common, asking 78
+   stool: bought at 78.0 from Kitchen Common, spent 186.0/442
+
+## settle mirror: 256.0 left
+   mirror: trying Lumen Lighting, asking 185
+   mirror: bought at 185.0 from Lumen Lighting, spent 371.0/442
 
 ## final
-BUDGET 448, spent 222.0, left 226.0
+BUDGET 442, spent 371.0, left 71.0
 
   item       shop                 ask  my last  round  state
-  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
-  bookshelf  The Book Nook        520      260      4  OPEN
-  stool      Nordic Seating         -        -      4  BOUGHT at 85.0
-  mirror     Hall and Entry         -        -      2  BOUGHT at 90.0
+  lamp       Bedside Manner         -        -      4  BOUGHT at 108.0
+  bookshelf  The Book Nook        525      220      4  OPEN
+  stool      Kitchen Common         -        -      4  BOUGHT at 78.0
+  mirror     Lumen Lighting         -        -      4  BOUGHT at 185.0

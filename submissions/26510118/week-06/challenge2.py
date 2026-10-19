@@ -42,7 +42,7 @@ import httpx
 
 import catalog
 import harness
-from buyer import last_number, message_text, receipt_price, state
+from buyer import last_number, message_text, settled, state
 
 HERE = Path(__file__).parent
 LOGS = HERE / "logs" / "challenge-2"          # --tag puts a run in a subfolder
@@ -398,9 +398,15 @@ async def run(tightness: float, tag: str = "") -> int:
                     t = next(it)
                     st = sb[label]
                     if state(t) == "TASK_STATE_COMPLETED":
-                        price = receipt_price(t) or st["mine"]
-                        if spent + price > budget:            # must never happen
-                            log(f"   !! {label} closed at {price} over budget; recorded")
+                        # The budget arithmetic lives here, so the receipt has
+                        # to be checked here. A shop charging 500 for an offer
+                        # of 100, or returning a negative price, would
+                        # otherwise go straight into `spent`.
+                        price, problem = settled(t, st["mine"], label)
+                        if problem:
+                            log(f"   !! {label}: {problem}; not counting it as bought")
+                            st["state"] = "BAD RECEIPT"
+                            continue
                         spent += price
                         bought[label] = {"shop": st["shop"], "price": price}
                         receipts.append(label)
@@ -430,7 +436,11 @@ async def run(tightness: float, tag: str = "") -> int:
                     if st["state"] == "OPEN" and ask is not None and spent + ask <= budget:
                         t = await keep[label]["shop"].send(str(ask), keep[label]["task"])
                         if state(t) == "TASK_STATE_COMPLETED":
-                            price = receipt_price(t) or ask
+                            price, problem = settled(t, ask, label)
+                            if problem:
+                                log(f"   !! {label}: {problem}; not counting it")
+                                st["state"] = "BAD RECEIPT"
+                                break
                             spent += price
                             bought[label] = {"shop": st["shop"], "price": price}
                             receipts.append(label)
