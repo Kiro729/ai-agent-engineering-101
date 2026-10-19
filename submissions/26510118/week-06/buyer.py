@@ -26,15 +26,23 @@ Run:
 """
 import re
 import sys
+import time
 import uuid
 
 import httpx
 
 import harness
 
-MAX_ROUNDS = 4           # offers before walking away; 4 x the 50 s
-                         # harness timeout stays inside the test's 300 s
+MAX_ROUNDS = 4           # offers before walking away
 TIMEOUT = 60             # seconds per HTTP request
+
+# The trade test kills a buyer that is still running after 300 s and fails the
+# run. Four harness calls at the 50 s timeout is 200 s, which fits -- but that
+# is an estimate, and the rest of this submission puts guarantees in code. Past
+# this many seconds the buyer stops asking the harness and finishes on rules,
+# so the deadline cannot be missed however slow the service gets.
+DEADLINE = 200
+_START = time.time()
 
 # Fallback ladder, used when the harness answers with nothing usable: walk up
 # fractions of the budget, ending at the budget itself.
@@ -87,6 +95,11 @@ def choose(item: str, budget: int, ask, rounds: int, hist, stalled: bool):
         return "walk", None
 
     rule = int(budget * LADDER[min(rounds - 1, len(LADDER) - 1)])
+    spent = time.time() - _START
+    if spent > DEADLINE:
+        log(f"[buyer] {spent:.0f}s spent of the test's 300s; finishing on rules")
+        return ("offer", min(rule, budget)) if not within else ("accept", ask)
+
     history = "".join(f"They asked {a}, you offered {o}. " for a, o in hist[-3:])
     out = harness.ask(PROMPT.format(item=item, budget=budget, ask=ask, rounds=rounds,
                                     max_rounds=MAX_ROUNDS,
