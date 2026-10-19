@@ -1,0 +1,109 @@
+## directory: 20 shops
+   Lumen Lighting     Lumen Lighting. We sell lamp, mirror -- 469 items in stock. We are a disco
+   Northlight Studio  Northlight Studio. We sell lamp, shelf -- 469 items in stock. We stock the
+   Glow and Glass     Glow and Glass. We sell lamp, mirror, table -- 703 items in stock. We stoc
+   Bedside Manner     Bedside Manner. We sell lamp, nightstand -- 469 items in stock. We stock t
+   Shelf Life         Shelf Life. We sell bookshelf, shelf -- 469 items in stock. We are a disco
+   Paper and Pine     Paper and Pine. We sell bookshelf, cabinet -- 469 items in stock. Fair pri
+   The Book Nook      The Book Nook. We sell bookshelf, nightstand -- 469 items in stock. We sto
+   Case and Cabinet   Case and Cabinet. We sell cabinet, shelf -- 468 items in stock. We stock t
+   Nordic Seating     Nordic Seating. We sell bench, chair, stool -- 703 items in stock. We are 
+   Perch Furniture    Perch Furniture. We sell chair, stool -- 469 items in stock. We stock the 
+   Kitchen Common     Kitchen Common. We sell bench, stool, table -- 702 items in stock. We are 
+   Low Table Co       Low Table Co. We sell coffee table, stool, table -- 702 items in stock. Fa
+   Hall and Entry     Hall and Entry. We sell bench, mirror, rug -- 702 items in stock. Fair pri
+   Reflections        Reflections. We sell mirror, wardrobe -- 468 items in stock. We are a disc
+   Oak and Co         Oak and Co. We sell desk, table -- 468 items in stock. We stock the higher
+   Deskworks          Deskworks. We sell chair, desk -- 469 items in stock. We are a discount sh
+   Lounge Theory      Lounge Theory. We sell coffee table, sofa -- 468 items in stock. We stock 
+   Soft Living        Soft Living. We sell rug, sofa -- 468 items in stock. We stock the higher 
+   Closet Works       Closet Works. We sell cabinet, wardrobe -- 468 items in stock. We are a di
+   Rug Republic       Rug Republic. We sell bench, rug -- 468 items in stock. Fair prices. Descr
+
+## quotes
+  lamp: shortlist ['Northlight Studio', 'Lumen Lighting', 'Bedside Manner']
+    Northlight Studio  The Modern Birch Lamp is 89
+    Lumen Lighting     The Modern Birch Lamp is 79
+    Bedside Manner     The Modern Birch Lamp is 87
+  bookshelf: shortlist ['Shelf Life', 'Paper and Pine', 'The Book Nook']
+    Shelf Life         The Industrial Walnut Bookshelf is 450
+    Paper and Pine     The Industrial Walnut Bookshelf is 450
+    The Book Nook      The Industrial Walnut Bookshelf is 520
+  stool: shortlist ['Kitchen Common', 'Nordic Seating', 'Low Table Co']
+    Kitchen Common     The Classic Birch Stool is 68
+    Nordic Seating     The Classic Birch Stool is 85
+    Low Table Co       The Classic Birch Stool is 85
+  mirror: shortlist ['Hall and Entry', 'Lumen Lighting', 'Reflections']
+    Hall and Entry     The Modern Pine Mirror is 150
+    Lumen Lighting     The Industrial Oak Mirror is 220
+    Reflections        The Industrial Oak Mirror is 185
+
+## budget 448 = 747 (cheapest asks) x 0.6
+   caps {'lamp': 47, 'bookshelf': 270, 'stool': 41, 'mirror': 90}
+
+## round 1: ['lamp', 'bookshelf', 'stool', 'mirror']
+BUDGET 448, spent 0, left 448
+
+  item       shop                 ask  my last  round  state
+  lamp       Lumen Lighting        79        -      0  OPEN
+  bookshelf  Shelf Life           450        -      0  OPEN
+  stool      Kitchen Common        68        -      0  OPEN
+  mirror     Hall and Entry       150        -      0  OPEN
+   lamp: harness '47' -> offer 47 (cap 47)
+   bookshelf: harness '200' -> offer 200 (cap 270)
+   stool: harness '41' -> offer 41 (cap 41)
+   mirror: harness '80' -> offer 80 (cap 90)
+   lamp: bought at 47.0, spent 47.0/448
+
+## round 2: ['bookshelf', 'stool', 'mirror']
+BUDGET 448, spent 47.0, left 401.0
+
+  item       shop                 ask  my last  round  state
+  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
+  bookshelf  Shelf Life           360      200      1  OPEN
+  stool      Kitchen Common        58       41      1  OPEN
+  mirror     Hall and Entry       125       80      1  OPEN
+   bookshelf: harness '250' -> offer 250 (cap 270.0)
+   stool: harness '41' -> offer 41 (cap 41.0)
+   mirror: harness '90' -> offer 90 (cap 90.0)
+   mirror: bought at 90.0, spent 137.0/448
+
+## round 3: ['bookshelf', 'stool']
+BUDGET 448, spent 137.0, left 311.0
+
+  item       shop                 ask  my last  round  state
+  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
+  bookshelf  Shelf Life           310      250      2  OPEN
+  stool      Kitchen Common        54       41      2  OPEN
+  mirror     Hall and Entry         -        -      2  BOUGHT at 90.0
+   bookshelf: harness '265' -> offer 265 (cap 270.0)
+   stool: harness '41' -> offer 41 (cap 41.0)
+
+## round 4: ['bookshelf', 'stool']
+BUDGET 448, spent 137.0, left 311.0
+
+  item       shop                 ask  my last  round  state
+  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
+  bookshelf  Shelf Life           295      265      3  OPEN
+  stool      Kitchen Common        52       41      3  OPEN
+  mirror     Hall and Entry         -        -      2  BOUGHT at 90.0
+   bookshelf: harness '260' -> offer 260 (cap 270.0)
+   stool: harness '41' -> offer 41 (cap 41.0)
+
+## settle bookshelf: 311.0 left
+   bookshelf: trying Paper and Pine, asking 450
+   bookshelf: trying The Book Nook, asking 520
+   bookshelf: no shop left to try
+
+## settle stool: 311.0 left
+   stool: trying Nordic Seating, asking 85
+   stool: bought at 85.0 from Nordic Seating, spent 222.0/448
+
+## final
+BUDGET 448, spent 222.0, left 226.0
+
+  item       shop                 ask  my last  round  state
+  lamp       Lumen Lighting         -        -      1  BOUGHT at 47.0
+  bookshelf  The Book Nook        520      260      4  OPEN
+  stool      Nordic Seating         -        -      4  BOUGHT at 85.0
+  mirror     Hall and Entry         -        -      2  BOUGHT at 90.0

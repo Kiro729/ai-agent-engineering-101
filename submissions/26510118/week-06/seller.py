@@ -272,14 +272,24 @@ class Seller(AgentExecutor):
                           context_id=task.context_id).cancel()
 
 
-def build(port: int) -> Starlette:
+def build(port: int, name: str = NAME, sells=None, mult: float = 1.0) -> Starlette:
+    """One shop. With no `sells` and no `mult` this is the whole catalogue at
+    list prices, which is what the trade test starts. Challenge 2 runs twenty
+    of these with different ranges and price levels, so that the Agent Cards
+    are worth reading."""
+    global NAME
+    NAME = name
     url = f"http://127.0.0.1:{port}/"
-    n = len(catalog.load())
+    n = catalog.configure(sells, mult)
+    kinds = ", ".join(catalog.categories())
+    price_note = ("We are a discount shop." if mult < 0.98 else
+                  "We stock the higher end." if mult > 1.02 else
+                  "Fair prices.")
     card = AgentCard(
-        name=NAME,
-        description=f"A furniture shop with {n} items: lamps, chairs, bookshelves, desks, "
-                    f"sofas, wardrobes and more. Describe what you need and we will find "
-                    f"it, then negotiate the price.",
+        name=name,
+        description=f"{name}. We sell {kinds} -- {n} items in stock. {price_note} "
+                    f"Describe what you need and we will find it, then negotiate "
+                    f"the price.",
         version="1.0.0",
         default_input_modes=["text/plain"],
         default_output_modes=["application/json", "text/plain"],
@@ -289,9 +299,10 @@ def build(port: int) -> Starlette:
         skills=[AgentSkill(
             id="negotiate",
             name="Find an item and negotiate a purchase",
-            description="Name an item or describe what you need, then send a price. "
-                        "The shop answers with a counteroffer or a receipt.",
-            tags=["shopping", "negotiation", "furniture"],
+            description=f"Name an item or describe what you need, then send a price. "
+                        f"We carry {kinds}. The shop answers with a counteroffer "
+                        f"or a receipt.",
+            tags=["shopping", "negotiation", "furniture"] + catalog.categories(),
             examples=["I want to buy a lamp",
                       "something wooden to keep about 40 books", "90"],
         )],
@@ -304,5 +315,10 @@ def build(port: int) -> Starlette:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=9999)
+    ap.add_argument("--name", default=NAME)
+    ap.add_argument("--sells", help="comma-separated categories; default is all of them")
+    ap.add_argument("--mult", type=float, default=1.0, help="price level, 1.0 is list")
     args = ap.parse_args()
-    uvicorn.run(build(args.port), host="127.0.0.1", port=args.port, log_level="warning")
+    sells = args.sells.split(",") if args.sells else None
+    uvicorn.run(build(args.port, args.name, sells, args.mult),
+                host="127.0.0.1", port=args.port, log_level="warning")

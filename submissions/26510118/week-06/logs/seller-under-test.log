@@ -1,9 +1,5 @@
 [seller] 'I want to buy a lamp' names lamp outright
 [seller] list price lamp: harness '180' -> 180
-[seller] lamp ask 180 offer 60 round 1: harness '130' -> 130
-[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
-[seller] lamp ask 115 offer 115 round 3: harness 'ACCEPT' -> ACCEPT
-[seller] 'I want to buy a lamp' names lamp outright
 [seller] lamp ask 180 offer 60 round 1: harness '150' -> 150
 [seller] lamp ask 150 offer 80 round 2: harness '125' -> 125
 [seller] lamp ask 125 offer 100 round 3: harness 'ACCEPT' -> ACCEPT
@@ -11,17 +7,21 @@
 [seller] lamp ask 180 offer 60 round 1: harness '140' -> 140
 [seller] lamp ask 140 offer 80 round 2: harness '120' -> 120
 [seller] lamp ask 120 offer 120 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] 'I want to buy a lamp' names lamp outright
+[seller] lamp ask 180 offer 60 round 1: harness '140' -> 140
+[seller] lamp ask 140 offer 80 round 2: harness '110' -> 110
+[seller] lamp ask 110 offer 110 round 3: harness 'ACCEPT' -> ACCEPT
 [seller] 'I want to buy a bookshelf' names bookshelf outright
-[seller] list price bookshelf: harness '340' -> 340
-[seller] bookshelf ask 340 offer 140 round 1: harness '300' -> 300
-[seller] bookshelf ask 300 offer 170 round 2: harness '270' -> 270
-[seller] bookshelf ask 270 offer 200 round 3: harness '260' -> 260
+[seller] list price bookshelf: harness '450' -> 450
+[seller] bookshelf ask 450 offer 140 round 1: harness '350' -> 350
+[seller] bookshelf ask 350 offer 170 round 2: harness '280' -> 280
+[harness] call failed (TimeoutExpired) after 65s; falling back
+[seller] bookshelf ask 280 offer 200 round 3: harness '' -> 240
 [seller] 'I want to buy a bookshelf' names bookshelf outright
-[seller] bookshelf ask 340 offer 140 round 1: harness '280' -> 280
-[harness] call failed (TimeoutExpired) after 66s; falling back
-[seller] bookshelf ask 280 offer 170 round 2: harness '' -> 225
-[seller] bookshelf already at the floor 260; holding without asking
+[seller] bookshelf ask 450 offer 140 round 1: harness '350' -> 350
+[seller] bookshelf ask 350 offer 170 round 2: harness '300' -> 300
+[seller] bookshelf ask 300 offer 200 round 3: harness '270' -> 270
 [seller] 'I want to buy a bookshelf' names bookshelf outright
-[seller] bookshelf ask 340 offer 140 round 1: harness '290' -> 290
-[seller] bookshelf ask 290 offer 170 round 2: harness '265' -> 265
-[seller] bookshelf ask 265 offer 200 round 3: harness '240' -> 240
+[seller] bookshelf ask 450 offer 140 round 1: harness '340' -> 340
+[seller] bookshelf ask 340 offer 170 round 2: harness '290' -> 290
+[seller] bookshelf ask 290 offer 200 round 3: harness '265' -> 265

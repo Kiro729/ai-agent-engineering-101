@@ -37,22 +37,58 @@ def _tokens(s: str) -> list[str]:
     return [t for t in re.findall(r"[a-z]+|\d+", s.lower()) if t not in STOP]
 
 
+tokens = _tokens          # the same splitter the shops use, for callers
+
+
 def load() -> list[dict]:
     """Read the catalogue once and precompute what the search needs."""
     global _ITEMS, _IDF
     if _ITEMS:
         return _ITEMS
     _ITEMS = json.loads(CATALOG_FILE.read_text(encoding="utf-8"))
-    df: dict[str, int] = {}
     for it in _ITEMS:
         toks = _tokens(it["name"] + " " + it["description"])
         it["_tok"] = set(toks)
         it["_num"] = [int(t) for t in toks if t.isdigit()]
+    _reindex()
+    return _ITEMS
+
+
+def configure(categories=None, mult: float = 1.0) -> int:
+    """Narrow this process's catalogue to one shop's range and prices.
+
+    Challenge 2 runs twenty shops, and twenty identical shops would make the
+    Agent Cards worthless to read -- the buyer has to be able to tell a
+    lighting shop from a seating one, and a cheap one from an expensive one.
+    Each shop is this same server with a slice of the catalogue and a price
+    multiplier. Called once at startup, before any search; with no arguments
+    the shop keeps the whole catalogue at list prices, which is what the trade
+    test gets.
+    """
+    items = load()
+    if categories:
+        keep = {c.strip().lower() for c in categories}
+        items = [i for i in items if i["category"] in keep]
+    if mult != 1.0:
+        items = [dict(i, reserve=max(20, round(i["reserve"] * mult))) for i in items]
+    global _ITEMS
+    _ITEMS = items
+    _reindex()
+    return len(_ITEMS)
+
+
+def _reindex() -> None:
+    global _IDF
+    df: dict[str, int] = {}
+    for it in _ITEMS:
         for t in it["_tok"]:
             df[t] = df.get(t, 0) + 1
-    n = len(_ITEMS)
+    n = max(1, len(_ITEMS))
     _IDF = {t: math.log(n / c) for t, c in df.items()}
-    return _ITEMS
+
+
+def categories() -> list[str]:
+    return sorted({i["category"] for i in load()})
 
 
 def by_id(item_id: str):

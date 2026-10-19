@@ -1,16 +1,16 @@
 {
   "kit_version": "1",
   "kit_sha256": "8e00baa43b319e6c0067eab8eedc6834cbe4b9dc3e9e2ab5bd16e9572c99f120",
-  "started": "2026-10-19T04:54:27+00:00",
+  "started": "2026-10-19T06:44:25+00:00",
   "harness": "Claude Code CLI (claude -p), model claude-haiku-4-5",
   "seller_cmd": "python seller.py --port {port}",
   "buyer_cmd": "python buyer.py {url} {item} {budget}",
   "seller_card": {
     "name": "Kiro Furniture",
-    "description": "A furniture shop with 3513 items: lamps, chairs, bookshelves, desks, sofas, wardrobes and more. Describe what you need and we will find it, then negotiate the price.",
+    "description": "Kiro Furniture. We sell bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe -- 3513 items in stock. Fair prices. Describe what you need and we will find it, then negotiate the price.",
     "supportedInterfaces": [
       {
-        "url": "http://127.0.0.1:52491/",
+        "url": "http://127.0.0.1:63095/",
         "protocolBinding": "JSONRPC",
         "protocolVersion": "1.0"
       }
@@ -30,11 +30,26 @@
       {
         "id": "negotiate",
         "name": "Find an item and negotiate a purchase",
-        "description": "Name an item or describe what you need, then send a price. The shop answers with a counteroffer or a receipt.",
+        "description": "Name an item or describe what you need, then send a price. We carry bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe. The shop answers with a counteroffer or a receipt.",
         "tags": [
           "shopping",
           "negotiation",
-          "furniture"
+          "furniture",
+          "bench",
+          "bookshelf",
+          "cabinet",
+          "chair",
+          "coffee table",
+          "desk",
+          "lamp",
+          "mirror",
+          "nightstand",
+          "rug",
+          "shelf",
+          "sofa",
+          "stool",
+          "table",
+          "wardrobe"
         ],
         "examples": [
           "I want to buy a lamp",
@@ -61,7 +76,7 @@
       "test": "seller_deal",
       "run": 1,
       "pass": true,
-      "detail": "TASK_STATE_COMPLETED, receipt price 115.0, asks [180, 130, 115]"
+      "detail": "TASK_STATE_COMPLETED, receipt price 100.0, asks [180, 150, 125]"
     },
     {
       "test": "seller_terminal",
@@ -73,31 +88,31 @@
       "test": "seller_deal",
       "run": 2,
       "pass": true,
-      "detail": "TASK_STATE_COMPLETED, receipt price 100.0, asks [180, 150, 125]"
+      "detail": "TASK_STATE_COMPLETED, receipt price 120.0, asks [180, 140, 120]"
     },
     {
       "test": "seller_deal",
       "run": 3,
       "pass": true,
-      "detail": "TASK_STATE_COMPLETED, receipt price 120.0, asks [180, 140, 120]"
+      "detail": "TASK_STATE_COMPLETED, receipt price 110.0, asks [180, 140, 110]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 1,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [340, 300, 270, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [450, 350, 280, 260]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 2,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [340, 280, 260, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [450, 350, 300, 270]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 3,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [340, 290, 265, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [450, 340, 290, 265]"
     },
     {
       "test": "buyer_deal",
@@ -145,7 +160,7 @@
       "test": "buyer_protocol_holds_budget",
       "run": 1,
       "pass": true,
-      "detail": "posts 5, without A2A-Version 1.0 0, follow-ups with taskId 3"
+      "detail": "posts 4, without A2A-Version 1.0 0, follow-ups with taskId 2"
     },
     {
       "test": "buyer_holds_budget",
@@ -157,7 +172,7 @@
       "test": "buyer_protocol_holds_budget",
       "run": 2,
       "pass": true,
-      "detail": "posts 5, without A2A-Version 1.0 0, follow-ups with taskId 3"
+      "detail": "posts 4, without A2A-Version 1.0 0, follow-ups with taskId 2"
     },
     {
       "test": "buyer_holds_budget",

@@ -1,0 +1,54 @@
+{
+  "shops": 20,
+  "shopping_list": {
+    "lamp": "a reading lamp for the study",
+    "bookshelf": "something wooden to hold about 60 books",
+    "stool": "a stool for the kitchen",
+    "mirror": "a mirror for the hallway"
+  },
+  "tightness": 0.6,
+  "budget": 448,
+  "cheapest_asks": {
+    "lamp": 79,
+    "bookshelf": 450,
+    "stool": 68,
+    "mirror": 150
+  },
+  "caps": {
+    "lamp": 47,
+    "bookshelf": 270,
+    "stool": 41,
+    "mirror": 90
+  },
+  "bought": {
+    "lamp": {
+      "shop": "Lumen Lighting",
+      "price": 47.0
+    },
+    "mirror": {
+      "shop": "Hall and Entry",
+      "price": 90.0
+    },
+    "stool": {
+      "shop": "Nordic Seating",
+      "price": 85.0
+    }
+  },
+  "spent": 222.0,
+  "all_items_bought": false,
+  "within_budget": true,
+  "receipts": [
+    "lamp",
+    "mirror",
+    "stool"
+  ],
+  "no_duplicates": true,
+  "harness_calls": 12,
+  "harness_failed": 0,
+  "prompt_chars": {
+    "calls": 12,
+    "min": 577,
+    "max": 769,
+    "mean": 731
+  }
+}

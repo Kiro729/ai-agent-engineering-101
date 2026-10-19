@@ -1,0 +1,48 @@
+[seller] 'I want to buy a reading lamp for the study' -> 8 candidates, harness '7'
+[seller]   chose itm-00289 'Modern Birch Lamp' reserve 73
+[seller] 'I want to buy a reading lamp for the study' -> 8 candidates, harness '8'
+[seller]   chose itm-00290 'Modern Birch Lamp' reserve 47
+[seller] 'I want to buy a reading lamp for the study' -> 8 candidates, harness '8'
+[seller]   chose itm-00290 'Modern Birch Lamp' reserve 55
+[seller] list price itm-00289: harness '125' -> 125
+[seller] list price itm-00290: harness '70' -> 70
+[seller] list price itm-00290: harness '78' -> 78
+[seller] 'I want to buy something wooden to hold about 60 books' -> 8 candidates, harness '1'
+[seller]   chose itm-00026 'Industrial Walnut Bookshelf' reserve 290
+[seller] 'I want to buy something wooden to hold about 60 books' -> 8 candidates, harness '1'
+[seller]   chose itm-00026 'Industrial Walnut Bookshelf' reserve 329
+[seller] 'I want to buy something wooden to hold about 60 books' -> 8 candidates, harness '1'
+[seller]   chose itm-00026 'Industrial Walnut Bookshelf' reserve 378
+[seller] list price itm-00026: harness '499' -> 499
+[seller] list price itm-00026: harness '550' -> 550
+[seller] list price itm-00026: harness '500' -> 500
+[seller] 'I want to buy a stool for the kitchen' -> 8 candidates, harness '8'
+[seller]   chose itm-01929 'Classic Birch Stool' reserve 51
+[seller] 'I want to buy a stool for the kitchen' -> 8 candidates, harness '8'
+[seller]   chose itm-01929 'Classic Birch Stool' reserve 55
+[seller] 'I want to buy a stool for the kitchen' -> 8 candidates, harness '8'
+[seller]   chose itm-01929 'Classic Birch Stool' reserve 52
+[seller] list price itm-01929: harness '75' -> 75
+[seller] list price itm-01929: harness '89' -> 89
+[seller] list price itm-01929: harness '120' -> 104
+[seller] 'I want to buy a mirror for the hallway' -> 8 candidates, harness '1'
+[seller]   chose itm-02347 'Industrial Oak Mirror' reserve 125
+[seller] 'I want to buy a mirror for the hallway' -> 8 candidates, harness '5'
+[seller]   chose itm-02377 'Modern Pine Mirror' reserve 76
+[seller] 'I want to buy a mirror for the hallway' -> 8 candidates, harness '1'
+[seller]   chose itm-02347 'Industrial Oak Mirror' reserve 139
+[seller] list price itm-02347: harness '175' -> 175
+[seller] list price itm-02377: harness '145' -> 145
+[seller] list price itm-02347: harness '199' -> 199
+[seller] itm-01929 ask 75 offer 60 round 1: harness '70' -> 70
+[seller] itm-00290 ask 70 offer 62 round 1: harness '66' -> 66
+[seller] itm-02377 ask 145 offer 110 round 1: harness '132' -> 132
+[seller] itm-00026 ask 499 offer 410 round 1: harness '450' -> 450
+[seller] itm-00026 ask 450 offer 425 round 2: harness '440' -> 440
+[seller] itm-00290 ask 66 offer 62 round 2: harness '64' -> 64
+[seller] itm-02377 ask 132 offer 129 round 2: harness '130' -> 130
+[seller] itm-01929 ask 70 offer 66 round 2: harness '68' -> 68
+[seller] itm-00026 ask 440 offer 437 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] itm-02377 ask 130 offer 129 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] itm-00290 ask 64 offer 62 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] itm-01929 ask 68 offer 66 round 3: harness '67' -> 67
