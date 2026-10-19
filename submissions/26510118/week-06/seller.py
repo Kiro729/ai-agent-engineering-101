@@ -42,6 +42,7 @@ from starlette.applications import Starlette
 
 import catalog
 import harness
+import prices
 from a2a.helpers import get_message_text, new_data_part, new_task_from_user_message, new_text_part
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -130,7 +131,8 @@ async def pick_item(text: str):
     if not found:
         return None
     lines = "\n".join(f"{i}. {catalog.line(it)}" for i, it in enumerate(found, 1))
-    out = await asyncio.to_thread(harness.ask, PICK_PROMPT.format(text=text, lines=lines))
+    out = await asyncio.to_thread(harness.ask,
+                                  PICK_PROMPT.format(text=prices.trim(text), lines=lines))
     d = _answer(out, 1)
     print(f"[seller] '{text[:60]}' -> {len(found)} candidates, harness {out!r}", flush=True)
     if d == "NONE":
@@ -191,6 +193,10 @@ class Seller(AgentExecutor):
             await event_queue.enqueue_event(task)
         up = TaskUpdater(event_queue=event_queue, task_id=task.id, context_id=task.context_id)
         say = lambda text: up.new_agent_message(parts=[new_text_part(text)])
+        # Challenge 3 drops the "last number is the price" rule, so the ask
+        # needs a machine-readable home. Grading reads this, not the sentence.
+        quote = lambda text, ask: up.new_agent_message(parts=[new_text_part(text)],
+                                                       metadata={"ask": int(ask)})
         text = get_message_text(context.message) or ""
         deal = self.open.get(task.id)
 
@@ -202,18 +208,21 @@ class Seller(AgentExecutor):
             ask = await list_price(item)
             self.open[task.id] = {"item": item, "ask": ask, "rounds": 0, "hist": []}
             # The trade test reads the ask as the LAST number in this message,
-            # so nothing numeric may follow it.
-            await up.requires_input(say(f"The {item['name']} is {ask}"))
+            # so nothing numeric may follow it; challenge 3 reads metadata.ask.
+            await up.requires_input(quote(f"The {item['name']} is {ask}", ask))
             return
 
-        m = re.search(r"\d+", text)
         item = deal["item"]
-        if m is None:
-            await up.requires_input(say(f"Send your offer as a number. "
-                                        f"The {item['name']} is {deal['ask']}"))
+        # A bare number costs nothing to read; a sentence with several numbers
+        # in it is read by the harness, and anything with 4300 digits is not a
+        # price (see prices.py).
+        offer = await asyncio.to_thread(prices.read_offer, text, harness.ask)
+        if offer is None:
+            await up.requires_input(quote(f"Send your offer as a number. "
+                                          f"The {item['name']} is {deal['ask']}", deal["ask"]))
             return
-
-        offer, reserve = int(m.group()), item["reserve"]
+        print(f"[seller] read offer {offer} from {text[:70]!r}", flush=True)
+        reserve = item["reserve"]
         deal["rounds"] += 1
         last_round = deal["rounds"] >= MAX_ROUNDS
         clears = offer >= reserve
@@ -263,7 +272,8 @@ class Seller(AgentExecutor):
         # holding out for more, which is a different thing and worth saying
         # honestly. The trade test reads the last number either way.
         lead = "I can do better than" if clears else "Too low at"
-        await up.requires_input(say(f"{lead} {offer}. The {item['name']} is {deal['ask']}"))
+        await up.requires_input(quote(f"{lead} {offer}. The {item['name']} is {deal['ask']}",
+                                      deal["ask"]))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task = context.current_task

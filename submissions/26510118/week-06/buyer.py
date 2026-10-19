@@ -32,6 +32,7 @@ import uuid
 import httpx
 
 import harness
+import prices
 
 MAX_ROUNDS = 4           # offers before walking away
 TIMEOUT = 60             # seconds per HTTP request
@@ -180,9 +181,30 @@ def message_text(t) -> str:
 
 
 def last_number(t):
-    """The seller's ask: the last number in its message, as the protocol note says."""
-    nums = re.findall(r"\d+(?:\.\d+)?", message_text(t))
-    return int(float(nums[-1])) if nums else None
+    """The shop's ask.
+
+    Three sources, in order of how much they can be trusted. `metadata.ask`
+    is the machine-readable one challenge 3 introduces and the only one that
+    survives a chatty shop. The sentence is the fallback for a shop that does
+    not set it -- the kit seller in the trade test does not.
+
+    When both exist and disagree, the higher one wins. A shop whose text says
+    300 while its metadata says 50 is either broken or baiting; paying the
+    lower figure means an offer that gets refused, and believing the cheaper
+    channel is exactly what a hostile shop would want.
+    """
+    meta = (t or {}).get("status", {}).get("message", {}).get("metadata") or {}
+    tagged = prices.digits(str(int(meta["ask"]))) if isinstance(
+        meta.get("ask"), (int, float)) and meta["ask"] > 0 else None
+
+    nums = prices.numbers(message_text(t))
+    spoken = nums[-1] if nums else None
+
+    if tagged is not None and spoken is not None and tagged != spoken:
+        log(f"[buyer] shop says {spoken} in words and {tagged} in metadata; "
+            f"taking {max(tagged, spoken)}")
+        return max(tagged, spoken)
+    return tagged if tagged is not None else spoken
 
 
 def receipt_price(t):
@@ -192,6 +214,15 @@ def receipt_price(t):
             if isinstance(d, dict) and isinstance(d.get("price"), (int, float)):
                 return d["price"]
     return None
+
+
+def settled(t, offered: int, item: str | None = None):
+    """What the shop actually charged, once its receipt has been checked.
+
+    The remote agent is opaque: its receipt is a claim, not a fact. Returns
+    (price, problem) -- see prices.check_receipt.
+    """
+    return prices.check_receipt((t or {}).get("artifacts"), offered, item)
 
 
 def main() -> int:
@@ -208,7 +239,7 @@ def main() -> int:
         return 0
     task_id = t["id"]
 
-    hist, prev_ask = [], None
+    hist, prev_ask, last_offer = [], None, None
     for rounds in range(1, MAX_ROUNDS + 1):
         ask = last_number(t)
         # A shop whose ask has stopped falling is at its floor. Asking the
@@ -222,13 +253,17 @@ def main() -> int:
             log(f"[buyer] refusing to send {price} over budget {budget}; walking away")
             break
         hist.append((ask, price))
-        prev_ask = ask
+        prev_ask, last_offer = ask, price
         t = c.send(str(price), task_id)
         if t is None or state(t) != "TASK_STATE_INPUT_REQUIRED":
             break
 
     if state(t) == "TASK_STATE_COMPLETED":
-        log(f"[buyer] bought {item} at {receipt_price(t)}")
+        price, problem = settled(t, last_offer if last_offer is not None else budget, item)
+        if problem:
+            log(f"[buyer] the shop closed but its receipt is wrong: {problem}")
+        else:
+            log(f"[buyer] bought {item} at {price}")
     else:
         log(f"[buyer] no deal ({state(t) or 'error'})")
         if state(t) == "TASK_STATE_INPUT_REQUIRED":
