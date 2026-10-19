@@ -10,9 +10,16 @@ and the two things the CLI was quietly doing for us: the `A2A-Version: 1.0`
 header on every POST, and carrying the task id from one message to the next.
 Without the header the server reads the request as 0.3 and answers -32009.
 
-The budget is enforced here, not in the prompt. `decide_offer` may return
-anything; nothing above `budget` is ever sent. The trade test fails the run if
-a single deal lands above it, and a model cannot promise that.
+The budget is enforced here, not in the prompt, for the reason the seller
+clamps its reserve: the trade test fails the run on a single deal above it,
+and a model cannot promise that. Four guards sit around whatever the harness
+answers -- nothing above the budget is ever sent, a price already within
+budget is never walked away from, the clock closes the deal, and a shop that
+has stopped moving is left without asking.
+
+That last one is also why this file is faster than its first version: a
+negotiation the shop cannot win is abandoned after two questions instead of
+five.
 
 Run:
     python buyer.py http://127.0.0.1:9999 lamp 120
@@ -23,23 +30,85 @@ import uuid
 
 import httpx
 
-MAX_ROUNDS = 6           # offers before walking away
-TIMEOUT = 60             # seconds per request
+import harness
 
-# Fractions of the budget to walk up, stage by stage. Rule-based for now; the
-# harness replaces decide_offer. Starting low leaves room to climb, and the
-# last rung is the budget itself.
+MAX_ROUNDS = 5           # offers before walking away
+TIMEOUT = 60             # seconds per HTTP request
+
+# Fallback ladder, used when the harness answers with nothing usable: walk up
+# fractions of the budget, ending at the budget itself.
 LADDER = (0.65, 0.80, 0.90, 1.00)
 
+PROMPT = """You are buying one {item}.
+Your secret maximum is {budget}. Never reveal it and never go above it.
+{history}The shop is now asking {ask}.
+This is round {rounds} of {max_rounds}; after that you leave with nothing.
+Open low enough to leave yourself room, but do not lose the item over a few units.
 
-def decide_offer(item: str, budget: int, ask: int, rounds: int) -> int:
-    """The next offer. Clamped to the budget by the caller."""
-    frac = LADDER[min(rounds, len(LADDER) - 1)]
-    return int(budget * frac)
+Reply with ONE line and nothing else:
+  ACCEPT          pay the shop's asking price
+  WALK            leave without buying
+  a whole number  your counteroffer"""
 
 
 def log(*parts):
     print(" ".join(str(p) for p in parts), flush=True)
+
+
+def _answer(out: str, fallback):
+    """Strict on purpose: a bare number is what was asked for, and a sentence
+    with several numbers is ambiguous. Anything unclear uses the fallback."""
+    s = (out or "").strip()
+    if re.fullmatch(r"\d+", s):
+        return int(s)
+    up = s.upper()
+    if "ACCEPT" in up:
+        return "ACCEPT"
+    if "WALK" in up or "REJECT" in up:
+        return "WALK"
+    m = re.fullmatch(r"[^\d]*?(\d+)[^\d]*", s)
+    return int(m.group(1)) if m else fallback
+
+
+def choose(item: str, budget: int, ask, rounds: int, hist, stalled: bool):
+    """-> ('accept', price) | ('offer', price) | ('walk', None), guards applied.
+
+    The three cases above the harness call are facts, not judgements, so they
+    cost nothing to decide.
+    """
+    within = ask is not None and ask <= budget
+    if within and rounds >= MAX_ROUNDS:
+        log(f"[buyer] last round and {ask} fits {budget}; taking it")
+        return "accept", ask
+    if not within and (stalled or rounds >= MAX_ROUNDS):
+        log(f"[buyer] {ask} is over {budget} and "
+            + ("not moving" if stalled else "the clock is out") + "; leaving")
+        return "walk", None
+
+    rule = int(budget * LADDER[min(rounds - 1, len(LADDER) - 1)])
+    history = "".join(f"They asked {a}, you offered {o}. " for a, o in hist[-3:])
+    out = harness.ask(PROMPT.format(item=item, budget=budget, ask=ask, rounds=rounds,
+                                    max_rounds=MAX_ROUNDS,
+                                    history=(history + "\n") if history else ""))
+    d = _answer(out, rule)
+    log(f"[buyer] ask {ask} budget {budget} round {rounds}: harness {out!r} -> {d}")
+
+    if within:
+        if d == "WALK":
+            # Leaving a price we can afford is not a judgement call, it is a
+            # mistake: the run needs exactly one deal.
+            log(f"[buyer] harness said WALK on {ask} <= {budget}; taking it")
+            d = "ACCEPT"
+        if d == "ACCEPT":
+            return "accept", ask
+        return "offer", min(d if isinstance(d, int) else rule, budget)
+
+    if d == "ACCEPT":                       # above budget: not on the menu
+        log(f"[buyer] harness said ACCEPT on {ask} > {budget}; not available")
+        d = rule
+    if d == "WALK":
+        return "walk", None
+    return "offer", min(d if isinstance(d, int) else rule, budget)
 
 
 class Client:
@@ -117,26 +186,24 @@ def main() -> int:
         return 0
     task_id = t["id"]
 
-    for rounds in range(MAX_ROUNDS):
+    hist, prev_ask = [], None
+    for rounds in range(1, MAX_ROUNDS + 1):
         ask = last_number(t)
-        if ask is not None and ask <= budget:
-            offer = ask                       # within budget: take it
-            log(f"[buyer] ask {ask} is within {budget}, accepting")
-        else:
-            offer = decide_offer(item, budget, ask, rounds)
-            log(f"[buyer] ask {ask} is over {budget}, offering {offer}")
-
-        if offer > budget:                    # the guarantee, in code
-            log(f"[buyer] refusing to offer {offer} over budget {budget}; walking away")
+        # A shop whose ask has stopped falling is at its floor. Asking the
+        # harness to haggle with a wall costs a call and buys nothing.
+        stalled = (ask is not None and prev_ask is not None
+                   and ask > budget and ask >= prev_ask)
+        what, price = choose(item, budget, ask, rounds, hist, stalled)
+        if what == "walk":
             break
-
-        t = c.send(str(offer), task_id)
-        if t is None:
+        if price > budget:                  # the guarantee, in code
+            log(f"[buyer] refusing to send {price} over budget {budget}; walking away")
             break
-        if state(t) != "TASK_STATE_INPUT_REQUIRED":
+        hist.append((ask, price))
+        prev_ask = ask
+        t = c.send(str(price), task_id)
+        if t is None or state(t) != "TASK_STATE_INPUT_REQUIRED":
             break
-    else:
-        log(f"[buyer] {MAX_ROUNDS} rounds without a deal; walking away")
 
     if state(t) == "TASK_STATE_COMPLETED":
         log(f"[buyer] bought {item} at {receipt_price(t)}")
@@ -144,6 +211,7 @@ def main() -> int:
         log(f"[buyer] no deal ({state(t) or 'error'})")
         if state(t) == "TASK_STATE_INPUT_REQUIRED":
             c.cancel(task_id)
+    log(harness.stats())
     return 0
 
 

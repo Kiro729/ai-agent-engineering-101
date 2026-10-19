@@ -1,12 +1,10 @@
-[buyer] shopping for lamp, budget 120, at http://127.0.0.1:59667
-[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:59667/
+[buyer] shopping for lamp, budget 120, at http://127.0.0.1:49815
+[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:49815/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
-[buyer] ask 130 is over 120, offering 78
-[buyer] -> '78' taskId=0d53baab
-[buyer] <- TASK_STATE_INPUT_REQUIRED | 78 is too low. Counteroffer: 104.
-[buyer] ask 104 is within 120, accepting
-[buyer] -> '104' taskId=0d53baab
-[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 104.
-[buyer] bought lamp at 104.0
+[buyer] ask 130 budget 120 round 1: harness '110' -> 110
+[buyer] -> '110' taskId=91b3bbdc
+[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 110.
+[buyer] bought lamp at 110.0
+[harness] 1 call(s), 0 failed, 10s total

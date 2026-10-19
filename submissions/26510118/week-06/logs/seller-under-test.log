@@ -1,0 +1,75 @@
+[seller] list price lamp: harness '165' -> 165
+[seller] lamp ask 165 offer 60 round 1: harness '135' -> 135
+[seller] lamp ask 135 offer 80 round 2: harness '115' -> 115
+[seller] lamp ask 115 offer 115 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] lamp ask 165 offer 60 round 1: harness '135' -> 135
+[seller] lamp ask 135 offer 80 round 2: harness '110' -> 110
+Failed to detach context
+Traceback (most recent call last):
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 602, in use_span
+    yield span
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 504, in start_as_current_span
+    yield span
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 441, in start_as_current_span
+    yield span
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\__init__.py", line 127, in detach
+    _RUNTIME_CONTEXT.detach(token)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\contextvars_context.py", line 40, in detach
+    self._current_context.reset(token)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+ValueError: <Token var=<ContextVar name='current_context' default={} at 0x000001E384A459E0> at 0x000001E3850C4500> was created in a different Context
+Task was destroyed but it is pending!
+task: <Task pending name='Task-55' coro=<EventQueueSource._dispatch_loop() done, defined at C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py:225> wait_for=<Future cancelled>>
+Failed to detach context
+Traceback (most recent call last):
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 602, in use_span
+    yield span
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 504, in start_as_current_span
+    yield span
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 441, in start_as_current_span
+    yield span
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py", line 242, in async_wrapper
+    result = await func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+GeneratorExit
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\__init__.py", line 127, in detach
+    _RUNTIME_CONTEXT.detach(token)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\contextvars_context.py", line 40, in detach
+    self._current_context.reset(token)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+ValueError: <Token var=<ContextVar name='current_context' default={} at 0x000001E384A459E0> at 0x000001E3850C5880> was created in a different Context
+Task was destroyed but it is pending!
+task: <Task pending name='Task-56' coro=<EventQueueSource._dispatch_loop() done, defined at C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py:225> wait_for=<Future cancelled>>
+[seller] lamp ask 110 offer 110 round 3: harness 'ACCEPT' -> ACCEPT
+[harness] call failed (TimeoutExpired) after 55s; falling back
+[seller] lamp ask 165 offer 60 round 1: harness '' -> 112
+[seller] lamp ask 112 offer 112 round 2: harness 'ACCEPT' -> ACCEPT
+[seller] list price bookshelf: harness '350' -> 350
+[harness] call failed (TimeoutExpired) after 64s; falling back
+[seller] bookshelf ask 350 offer 140 round 1: harness '' -> 245
+[harness] call failed (TimeoutExpired) after 48s; falling back
+[seller] bookshelf ask 260 offer 170 round 2: harness '' -> 215
+[seller] bookshelf ask 260 offer 200 round 3: harness '240' -> 240
+[seller] bookshelf ask 350 offer 140 round 1: harness '300' -> 300
+[seller] bookshelf ask 300 offer 170 round 2: harness '270' -> 270
+[harness] call failed (TimeoutExpired) after 98s; falling back
+[seller] bookshelf ask 270 offer 200 round 3: harness '' -> 235
+[seller] bookshelf ask 350 offer 140 round 1: harness '290' -> 290
+[harness] call failed (TimeoutExpired) after 52s; falling back
+[seller] bookshelf ask 290 offer 170 round 2: harness '' -> 230
+[harness] call failed (TimeoutExpired) after 35s; falling back
+[seller] bookshelf ask 260 offer 200 round 3: harness '' -> 230
