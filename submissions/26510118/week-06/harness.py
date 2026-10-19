@@ -9,10 +9,12 @@ Both agents ask the same way: a prompt in, one line out. Three details matter.
     folder it answers "None." Repository rules have no business in a price
     negotiation, and they would arrive as instructions.
 
-    The timeout is short. A healthy call takes about 7 s. The first run of
-    this file used 90 s, one call hung, and the whole trade test ran past 15
-    minutes against a 4 min 41 s reference. The buyer has 300 s for an entire
-    run, so a hung call has to cost less than a run.
+    The timeout is 50 s, chosen by measurement rather than taste. The same
+    trivial prompt came back in 6 s, 48 s and 25 s on three consecutive
+    tries, so the spread is the service, not the question. At 90 s one hung
+    call cost a minute and a half; at 35 s a third of the calls were thrown
+    away while still alive. 50 s keeps the slow answers and bounds the
+    buyer, which has 300 s for a whole run and asks at most four times.
 
     Nothing here is trusted. `ask` returns "" on a timeout, a crash, or an
     empty answer, and every caller has a rule to fall back on. A harness that
@@ -30,7 +32,7 @@ CMD = os.environ.get(
     "HARNESS_CMD",
     'claude -p --model haiku --tools "" --setting-sources "" --no-session-persistence')
 
-TIMEOUT = int(os.environ.get("HARNESS_TIMEOUT", "35"))
+TIMEOUT = int(os.environ.get("HARNESS_TIMEOUT", "50"))
 
 _EMPTY = None
 CALLS = {"n": 0, "failed": 0, "seconds": 0.0}

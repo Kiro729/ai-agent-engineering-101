@@ -1,10 +1,18 @@
-[buyer] shopping for lamp, budget 120, at http://127.0.0.1:49815
-[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:49815/
+[buyer] shopping for lamp, budget 120, at http://127.0.0.1:61773
+[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:61773/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
-[buyer] ask 130 budget 120 round 1: harness '110' -> 110
-[buyer] -> '110' taskId=91b3bbdc
-[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 110.
-[buyer] bought lamp at 110.0
-[harness] 1 call(s), 0 failed, 10s total
+[harness] call failed (TimeoutExpired) after 56s; falling back
+[buyer] ask 130 budget 120 round 1: harness '' -> 78
+[buyer] -> '78' taskId=6e24a7e5
+[buyer] <- TASK_STATE_INPUT_REQUIRED | 78 is too low. Counteroffer: 104.
+[harness] call failed (TimeoutExpired) after 51s; falling back
+[buyer] ask 104 budget 120 round 2: harness '' -> 96
+[buyer] -> '96' taskId=6e24a7e5
+[buyer] <- TASK_STATE_INPUT_REQUIRED | 96 is too low. Counteroffer: 100.
+[buyer] ask 100 budget 120 round 3: harness 'ACCEPT' -> ACCEPT
+[buyer] -> '100' taskId=6e24a7e5
+[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 100.
+[buyer] bought lamp at 100.0
+[harness] 3 call(s), 2 failed, 119s total

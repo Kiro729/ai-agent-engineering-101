@@ -1,9 +1,9 @@
-[seller] list price lamp: harness '165' -> 165
-[seller] lamp ask 165 offer 60 round 1: harness '135' -> 135
-[seller] lamp ask 135 offer 80 round 2: harness '115' -> 115
-[seller] lamp ask 115 offer 115 round 3: harness 'ACCEPT' -> ACCEPT
-[seller] lamp ask 165 offer 60 round 1: harness '135' -> 135
-[seller] lamp ask 135 offer 80 round 2: harness '110' -> 110
+[seller] list price lamp: harness '180' -> 180
+[seller] lamp ask 180 offer 60 round 1: harness '140' -> 140
+[seller] lamp ask 140 offer 80 round 2: harness '120' -> 120
+[seller] lamp ask 120 offer 120 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] lamp ask 180 offer 60 round 1: harness '140' -> 140
+[seller] lamp ask 140 offer 80 round 2: harness '110' -> 110
 Failed to detach context
 Traceback (most recent call last):
   File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\trace\__init__.py", line 602, in use_span
@@ -26,7 +26,7 @@ Traceback (most recent call last):
   File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\contextvars_context.py", line 40, in detach
     self._current_context.reset(token)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-ValueError: <Token var=<ContextVar name='current_context' default={} at 0x000001E384A459E0> at 0x000001E3850C4500> was created in a different Context
+ValueError: <Token var=<ContextVar name='current_context' default={} at 0x0000014EB5A41A30> at 0x0000014EB60C5180> was created in a different Context
 Task was destroyed but it is pending!
 task: <Task pending name='Task-55' coro=<EventQueueSource._dispatch_loop() done, defined at C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py:225> wait_for=<Future cancelled>>
 Failed to detach context
@@ -51,25 +51,22 @@ Traceback (most recent call last):
   File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\contextvars_context.py", line 40, in detach
     self._current_context.reset(token)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-ValueError: <Token var=<ContextVar name='current_context' default={} at 0x000001E384A459E0> at 0x000001E3850C5880> was created in a different Context
+ValueError: <Token var=<ContextVar name='current_context' default={} at 0x0000014EB5A41A30> at 0x0000014EB60C7580> was created in a different Context
 Task was destroyed but it is pending!
 task: <Task pending name='Task-56' coro=<EventQueueSource._dispatch_loop() done, defined at C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py:225> wait_for=<Future cancelled>>
 [seller] lamp ask 110 offer 110 round 3: harness 'ACCEPT' -> ACCEPT
-[harness] call failed (TimeoutExpired) after 55s; falling back
-[seller] lamp ask 165 offer 60 round 1: harness '' -> 112
-[seller] lamp ask 112 offer 112 round 2: harness 'ACCEPT' -> ACCEPT
-[seller] list price bookshelf: harness '350' -> 350
-[harness] call failed (TimeoutExpired) after 64s; falling back
-[seller] bookshelf ask 350 offer 140 round 1: harness '' -> 245
-[harness] call failed (TimeoutExpired) after 48s; falling back
-[seller] bookshelf ask 260 offer 170 round 2: harness '' -> 215
-[seller] bookshelf ask 260 offer 200 round 3: harness '240' -> 240
-[seller] bookshelf ask 350 offer 140 round 1: harness '300' -> 300
-[seller] bookshelf ask 300 offer 170 round 2: harness '270' -> 270
-[harness] call failed (TimeoutExpired) after 98s; falling back
-[seller] bookshelf ask 270 offer 200 round 3: harness '' -> 235
-[seller] bookshelf ask 350 offer 140 round 1: harness '290' -> 290
-[harness] call failed (TimeoutExpired) after 52s; falling back
-[seller] bookshelf ask 290 offer 170 round 2: harness '' -> 230
-[harness] call failed (TimeoutExpired) after 35s; falling back
-[seller] bookshelf ask 260 offer 200 round 3: harness '' -> 230
+[seller] lamp ask 180 offer 60 round 1: harness '140' -> 140
+[seller] lamp ask 140 offer 80 round 2: harness '110' -> 110
+[seller] lamp ask 110 offer 110 round 3: harness 'ACCEPT' -> ACCEPT
+[harness] call failed (TimeoutExpired) after 62s; falling back
+[seller] list price bookshelf: harness '' -> 338
+[seller] bookshelf ask 338 offer 140 round 1: harness '295' -> 295
+[seller] bookshelf ask 295 offer 170 round 2: harness '270' -> 270
+[seller] bookshelf ask 270 offer 200 round 3: harness '260' -> 260
+[seller] bookshelf ask 338 offer 140 round 1: harness '280' -> 280
+[seller] bookshelf ask 280 offer 170 round 2: harness '245' -> 245
+[seller] bookshelf already at the floor 260; holding without asking
+[seller] bookshelf ask 338 offer 140 round 1: harness '300' -> 300
+[seller] bookshelf ask 300 offer 170 round 2: harness '275' -> 275
+[harness] call failed (TimeoutExpired) after 58s; falling back
+[seller] bookshelf ask 275 offer 200 round 3: harness '' -> 237

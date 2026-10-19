@@ -171,11 +171,19 @@ class Seller(AgentExecutor):
         last_round = deal["rounds"] >= MAX_ROUNDS
         clears = offer >= reserve
 
-        # On the last round the outcome is already decided -- take the money if
-        # there is money, otherwise leave -- so there is nothing to ask about.
-        d = "ACCEPT" if (last_round and clears) else \
-            "REJECT" if last_round else \
-            await decide_turn(deal, offer)
+        # Three outcomes are already decided, and a decided outcome is not
+        # worth a harness call: on the last round take the money if there is
+        # money and leave if there is not, and once the ask has reached the
+        # reserve there is nothing left to concede, so the answer repeats.
+        at_floor = deal["ask"] <= reserve
+        if last_round:
+            d = "ACCEPT" if clears else "REJECT"
+        elif not clears and at_floor:
+            print(f"[seller] {item} already at the floor {reserve}; holding without asking",
+                  flush=True)
+            d = reserve
+        else:
+            d = await decide_turn(deal, offer)
 
         if clears:
             # Profitable. The harness may hold out for more, but it may not

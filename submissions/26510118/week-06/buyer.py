@@ -32,7 +32,8 @@ import httpx
 
 import harness
 
-MAX_ROUNDS = 5           # offers before walking away
+MAX_ROUNDS = 4           # offers before walking away; 4 x the 50 s
+                         # harness timeout stays inside the test's 300 s
 TIMEOUT = 60             # seconds per HTTP request
 
 # Fallback ladder, used when the harness answers with nothing usable: walk up
