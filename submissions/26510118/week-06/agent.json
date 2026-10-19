@@ -1,0 +1,9 @@
+{
+  "harness": "Claude Code CLI (claude -p), model claude-haiku-4-5",
+  "seller": {
+    "cmd": "python seller.py --port {port}"
+  },
+  "buyer": {
+    "cmd": "python buyer.py {url} {item} {budget}"
+  }
+}
