@@ -212,7 +212,11 @@ class Seller(AgentExecutor):
 
         deal["hist"].append((deal["ask"], offer))
         deal["ask"] = _clamp(item, d if isinstance(d, int) else deal["ask"])
-        await up.requires_input(say(f"{offer} is too low. The {item} is {deal['ask']}"))
+        # An offer that clears the reserve is not "too low" -- the shop is
+        # holding out for more, which is a different thing and worth saying
+        # honestly. The trade test reads the last number either way.
+        lead = "I can do better than" if clears else "Too low at"
+        await up.requires_input(say(f"{lead} {offer}. The {item} is {deal['ask']}"))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task = context.current_task
