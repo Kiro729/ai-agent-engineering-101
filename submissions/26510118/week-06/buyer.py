@@ -24,6 +24,7 @@ five.
 Run:
     python buyer.py http://127.0.0.1:9999 lamp 120
 """
+import os
 import re
 import sys
 import time
@@ -34,15 +35,21 @@ import httpx
 import harness
 import prices
 
-MAX_ROUNDS = 4           # offers before walking away
-TIMEOUT = 60             # seconds per HTTP request
+# The defaults are the trade test's numbers and nothing reads the environment
+# during it. Trading with a classmate's shop is a different setting: their
+# harness is as slow as mine, their machine is across a tunnel, and the 300 s
+# cap that shapes these values does not apply. BUYER_HTTP_TIMEOUT,
+# BUYER_DEADLINE and BUYER_ROUNDS relax them for that case without touching
+# what the test runs.
+MAX_ROUNDS = int(os.environ.get("BUYER_ROUNDS", "4"))
+TIMEOUT = int(os.environ.get("BUYER_HTTP_TIMEOUT", "60"))
 
 # The trade test kills a buyer that is still running after 300 s and fails the
-# run. Four harness calls at the 50 s timeout is 200 s, which fits -- but that
-# is an estimate, and the rest of this submission puts guarantees in code. Past
+# run. Four harness calls at the 50 s timeout is 200 s, which fits, but that is
+# an estimate and the rest of this submission puts guarantees in code. Past
 # this many seconds the buyer stops asking the harness and finishes on rules,
 # so the deadline cannot be missed however slow the service gets.
-DEADLINE = 200
+DEADLINE = int(os.environ.get("BUYER_DEADLINE", "200"))
 _START = time.time()
 
 # Fallback ladder, used when the harness answers with nothing usable: walk up
@@ -138,7 +145,17 @@ class Client:
     def __init__(self, base: str):
         self.http = httpx.Client(timeout=TIMEOUT)
         card = self.http.get(base.rstrip("/") + "/.well-known/agent-card.json").json()
-        iface = (card.get("supportedInterfaces") or [{}])[0]
+        ifaces = card.get("supportedInterfaces") or [{}]
+        # Take the first interface this client can actually speak rather than
+        # simply the first one listed. A shop that offers HTTP+JSON only -- the
+        # lab's echo server does -- would otherwise be sent JSON-RPC bodies and
+        # answer nothing useful, which is a confusing way to find out.
+        iface = next((i for i in ifaces if i.get("protocolBinding") == "JSONRPC"), None)
+        if iface is None:
+            iface = ifaces[0]
+            log(f"[buyer] this shop offers "
+                f"{[i.get('protocolBinding') for i in ifaces]} and not JSONRPC; "
+                f"trying {iface.get('protocolBinding')} anyway")
         self.url = iface.get("url") or base
         log(f"[buyer] card: {card.get('name')!r} via {iface.get('protocolBinding')} {self.url}")
         log(f"[buyer] skills: {[s.get('id') for s in card.get('skills') or []]}")
@@ -197,8 +214,15 @@ def last_number(t):
     tagged = prices.digits(str(int(meta["ask"]))) if isinstance(
         meta.get("ask"), (int, float)) and meta["ask"] > 0 else None
 
-    nums = prices.numbers(message_text(t))
-    spoken = nums[-1] if nums else None
+    text = message_text(t)
+    nums = prices.numbers(text)
+    if tagged is None and len(nums) > 1:
+        # No metadata and more than one number: the same reading problem the
+        # shop has with a chatty buyer, from the other end. Taking the last
+        # number is what challenge 3 showed to be wrong.
+        spoken = prices.read_offer(text, harness.ask)
+    else:
+        spoken = nums[-1] if nums else None
 
     if tagged is not None and spoken is not None and tagged != spoken:
         log(f"[buyer] shop says {spoken} in words and {tagged} in metadata; "

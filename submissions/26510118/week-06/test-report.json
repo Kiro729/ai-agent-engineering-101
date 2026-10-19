@@ -1,7 +1,7 @@
 {
   "kit_version": "1",
   "kit_sha256": "8e00baa43b319e6c0067eab8eedc6834cbe4b9dc3e9e2ab5bd16e9572c99f120",
-  "started": "2026-10-19T07:25:12+00:00",
+  "started": "2026-10-19T07:56:28+00:00",
   "harness": "Claude Code CLI (claude -p), model claude-haiku-4-5",
   "seller_cmd": "python seller.py --port {port}",
   "buyer_cmd": "python buyer.py {url} {item} {budget}",
@@ -10,7 +10,7 @@
     "description": "Kiro Furniture. We sell bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe -- 3513 items in stock. Fair prices. Describe what you need and we will find it, then negotiate the price.",
     "supportedInterfaces": [
       {
-        "url": "http://127.0.0.1:60567/",
+        "url": "http://127.0.0.1:59462/",
         "protocolBinding": "JSONRPC",
         "protocolVersion": "1.0"
       }
@@ -70,13 +70,13 @@
       "test": "seller_opens",
       "run": 1,
       "pass": true,
-      "detail": "first message -> TASK_STATE_INPUT_REQUIRED, ask 160"
+      "detail": "first message -> TASK_STATE_INPUT_REQUIRED, ask 165"
     },
     {
       "test": "seller_deal",
       "run": 1,
       "pass": true,
-      "detail": "TASK_STATE_COMPLETED, receipt price 110.0, asks [160, 130, 110]"
+      "detail": "TASK_STATE_COMPLETED, receipt price 115.0, asks [165, 130, 115]"
     },
     {
       "test": "seller_terminal",
@@ -88,37 +88,37 @@
       "test": "seller_deal",
       "run": 2,
       "pass": true,
-      "detail": "TASK_STATE_COMPLETED, receipt price 115.0, asks [160, 130, 115]"
+      "detail": "TASK_STATE_COMPLETED, receipt price 115.0, asks [165, 135, 115]"
     },
     {
       "test": "seller_deal",
       "run": 3,
       "pass": true,
-      "detail": "TASK_STATE_COMPLETED, receipt price 110.0, asks [160, 130, 110]"
+      "detail": "TASK_STATE_COMPLETED, receipt price 110.0, asks [165, 135, 110]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 1,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [360, 300, 260, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [380, 300, 270, 260]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 2,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [360, 310, 270, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [380, 320, 270, 260]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 3,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [360, 310, 280, 265]"
+      "detail": "TASK_STATE_REJECTED, asks [380, 330, 280, 260]"
     },
     {
       "test": "buyer_deal",
       "run": 1,
       "pass": true,
-      "detail": "deals [110] (budget 120)"
+      "detail": "deals [100] (budget 120)"
     },
     {
       "test": "buyer_protocol_deal",
@@ -130,7 +130,7 @@
       "test": "buyer_deal",
       "run": 2,
       "pass": true,
-      "detail": "deals [100] (budget 120)"
+      "detail": "deals [105] (budget 120)"
     },
     {
       "test": "buyer_protocol_deal",
@@ -184,7 +184,7 @@
       "test": "buyer_protocol_holds_budget",
       "run": 3,
       "pass": true,
-      "detail": "posts 4, without A2A-Version 1.0 0, follow-ups with taskId 2"
+      "detail": "posts 5, without A2A-Version 1.0 0, follow-ups with taskId 3"
     }
   ],
   "passed": true

@@ -282,14 +282,22 @@ class Seller(AgentExecutor):
                           context_id=task.context_id).cancel()
 
 
-def build(port: int, name: str = NAME, sells=None, mult: float = 1.0) -> Starlette:
+def build(port: int, name: str = NAME, sells=None, mult: float = 1.0,
+          public_url: str | None = None) -> Starlette:
     """One shop. With no `sells` and no `mult` this is the whole catalogue at
     list prices, which is what the trade test starts. Challenge 2 runs twenty
     of these with different ranges and price levels, so that the Agent Cards
-    are worth reading."""
+    are worth reading.
+
+    `public_url` is the address the card advertises, which is not always the
+    address the server listens on. A client reads the card and then talks to
+    `supportedInterfaces[0].url`, so a card saying 127.0.0.1 sends a buyer on
+    another machine to its own computer. Behind a tunnel or on a host, the
+    shop has to advertise the address the other side can actually reach.
+    """
     global NAME
     NAME = name
-    url = f"http://127.0.0.1:{port}/"
+    url = (public_url.rstrip("/") + "/") if public_url else f"http://127.0.0.1:{port}/"
     n = catalog.configure(sells, mult)
     kinds = ", ".join(catalog.categories())
     price_note = ("We are a discount shop." if mult < 0.98 else
@@ -319,7 +327,9 @@ def build(port: int, name: str = NAME, sells=None, mult: float = 1.0) -> Starlet
     )
     handler = DefaultRequestHandler(agent_executor=Seller(), task_store=InMemoryTaskStore(),
                                     agent_card=card)
-    return Starlette(routes=create_agent_card_routes(card) + create_jsonrpc_routes(handler, "/"))
+    app = Starlette(routes=create_agent_card_routes(card) + create_jsonrpc_routes(handler, "/"))
+    app.state.card_url = url
+    return app
 
 
 if __name__ == "__main__":
@@ -328,7 +338,14 @@ if __name__ == "__main__":
     ap.add_argument("--name", default=NAME)
     ap.add_argument("--sells", help="comma-separated categories; default is all of them")
     ap.add_argument("--mult", type=float, default=1.0, help="price level, 1.0 is list")
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="address to listen on; 0.0.0.0 to accept other machines")
+    ap.add_argument("--public-url", dest="public_url",
+                    help="address the Agent Card advertises, when it differs from the "
+                         "listening one (a LAN IP, a tunnel, a deployed host)")
     args = ap.parse_args()
     sells = args.sells.split(",") if args.sells else None
-    uvicorn.run(build(args.port, args.name, sells, args.mult),
-                host="127.0.0.1", port=args.port, log_level="warning")
+    app = build(args.port, args.name, sells, args.mult, args.public_url)
+    print(f"[seller] listening on {args.host}:{args.port}, "
+          f"card advertises {app.state.card_url}", flush=True)
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
