@@ -221,6 +221,9 @@ review for other buyers, naming the real numbers.
 
 What happened: {facts}
 
+A no deal only because the budget was below the shop's price is not the shop's fault;
+keep such a review neutral rather than negative.
+
 Reply with ONE line of JSON and nothing else:
 {{"stars": <whole number 1-5>, "review": "<one sentence: the price vs budget, the rounds, and whether the receipt matched>"}}"""
 
@@ -251,6 +254,10 @@ def make_review(r: dict) -> tuple[int, str]:
         except Exception:                               # noqa: BLE001
             pass
     stars = min(5, max(1, stars if stars is not None else derive_stars(r)))     # always a whole 1-5
+    if not r["deal"]:
+        stars = 3            # no deal because the budget was below the shop's price is not its fault
+    elif r["honest"] is False:
+        stars = 1            # a wrong receipt is never rewarded, whatever the model felt
     if not review:                                      # never empty
         if r["deal"]:
             review = (f"Bought the {r['item']} at {r['price']} of {r['budget']} budget in {r['rounds']} rounds; "
