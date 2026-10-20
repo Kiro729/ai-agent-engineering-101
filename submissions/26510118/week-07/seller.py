@@ -268,13 +268,24 @@ class Seller(AgentExecutor):
         deal["rounds"] += 1
         last_round = deal["rounds"] >= MAX_ROUNDS
         clears = offer >= reserve
+        # Reputation velocity: an offer that clears the reserve and is already
+        # within reach of the ask is worth closing now rather than nibbling for
+        # the last few units. Squeezing a buyer who is this close mostly earns a
+        # slower, grumpier review and risks a walk; a quick, fair deal earns
+        # "came down to my budget" and brings the next customer. A little margin
+        # for reputation.
+        close_enough = clears and deal["rounds"] >= 2 and offer >= deal["ask"] * 0.9
 
-        # Three outcomes are already decided, and a decided outcome is not
-        # worth a harness call: on the last round take the money if there is
-        # money and leave if there is not, and once the ask has reached the
-        # reserve there is nothing left to concede, so the answer repeats.
+        # Four outcomes are already decided, and a decided outcome is not worth a
+        # harness call: on the last round take the money if there is money and
+        # leave if there is not; take a close-enough clearing offer; and once the
+        # ask has reached the reserve there is nothing left to concede.
         if last_round:
             d = "ACCEPT" if clears else "REJECT"
+        elif close_enough:
+            print(f"[seller] {offer} clears {reserve} and is within reach of {deal['ask']}; "
+                  f"closing fast", flush=True)
+            d = "ACCEPT"
         elif not clears and deal["ask"] <= reserve:
             print(f"[seller] {item['id']} already at the floor {reserve}; holding without asking",
                   flush=True)

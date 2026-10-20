@@ -1,14 +1,11 @@
-[market_buyer] Kit Shop North: stars 1.2988929889298892, score 1.70 [avoided]
-[market_buyer] Kit Shop South: stars 4.66789667896679, score 5.00
-[market_buyer] chose Kit Shop South http://127.0.0.1:57661
-[buyer] card: 'Kit Shop South' via JSONRPC http://127.0.0.1:57661/
+[market_buyer] Kit Shop North: stars 1.2988929889298892, score 1.52 [avoided]
+[market_buyer] Kit Shop South: stars 4.66789667896679, score 4.81
+[market_buyer] chose Kit Shop South http://127.0.0.1:60588
+[buyer] card: 'Kit Shop South' via JSONRPC http://127.0.0.1:60588/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
-[buyer] ask 130 budget 120 round 1: harness '95' -> 95
-[buyer] -> '95' taskId=68f769e4
-[buyer] <- TASK_STATE_INPUT_REQUIRED | 95 is too low. Counteroffer: 112.
-[buyer] ask 112 budget 120 round 2: harness '103' -> 103
-[buyer] -> '103' taskId=68f769e4
-[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 103.
-{"shop": "http://127.0.0.1:57661", "receipt": {"task": "68f769e4-ce1c-4166-8dc1-cd719ed4802a", "item": "lamp", "sig_seller": "IlbAiRuzk33DQoS34/md6EByOX3LTVBdmBH0h8s4dXXTH6rWMiZ37aE5LEVRGmtEZCTi7i9lHxdKnDaALBpEDQ==", "shop": "Kit Shop South", "price": 103.0}, "stars": 4, "review": "Got it for $103 against a $120 budget after 2 rounds of negotiation, and the receipt matched the agreed price."}
+[market_buyer] opening at remembered low 100.0 (shop asked 130)
+[buyer] -> '100.0' taskId=ef0972a3
+[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 100.
+{"shop": "http://127.0.0.1:60588", "receipt": {"task": "ef0972a3-815d-4e3a-b914-3201fe25c586", "item": "lamp", "sig_seller": "QiWv7UL5NA1BhTUg3FYh368DerTcHKB8VsMqL5Jneio9rSP2aYp6kMdZtSmlk9ZcdPpQZa0dU1MqWzB7sJgoDQ==", "shop": "Kit Shop South", "price": 100.0}, "stars": 3, "review": "Deal closed in 1 round at the full budget of $120 with no discount off the shop's $100... wait, paid $100 against a $120 budget, and the receipt matched, but since it took the full amount offered with no bargaining, I'd rate it average."}

@@ -52,6 +52,7 @@ import prices
 
 BAD_STARS = 2.5       # a trust-weighted average below this, with a safer shop around, is avoided
 EXPLORE = 0.4         # nudge for a shop never traded with, so a new shop can win a first customer
+CROWD = 0.06          # mild penalty per review: among good shops, lean to the less-crowded (hungrier) one
 SHORTLIST = 3         # how many survivors the harness chooses among
 
 
@@ -106,7 +107,7 @@ def is_bad(ws: float | None, past: dict | None) -> bool:
     return bool(past and past.get("agg", {}).get("cheated", 0) > 0)
 
 
-def score(name: str, ws: float | None, past: dict | None, mem: dict) -> float:
+def score(name: str, ws: float | None, past: dict | None, mem: dict, n_reviews: int) -> float:
     s = ws if ws is not None else 3.0                   # no reviews -> neutral, not punished
     agg = (past or {}).get("agg") or {}
     if agg.get("deals"):
@@ -115,6 +116,11 @@ def score(name: str, ws: float | None, past: dict | None, mem: dict) -> float:
         s += (1 - agg.get("avg_price_ratio", 1.0)) * 2.0
     if name not in mem:
         s += EXPLORE                                    # never tried -> a small push to explore
+    # Contrarian: when every buyer reads the same reviews and piles onto the one
+    # most-reviewed shop, that shop has no reason to discount. A mild penalty for
+    # the crowd leans toward a solid but hungrier shop. It never rescues a bad
+    # one -- those are already filtered out.
+    s -= CROWD * n_reviews
     return s
 
 
@@ -133,7 +139,7 @@ def select(shops: list, mem: dict, item: str, budget: int):
         ws = weighted_stars(sh.get("reviews"))
         past = mem.get(sh["name"])
         scored.append({"shop": sh, "ws": ws, "bad": is_bad(ws, past),
-                       "score": score(sh["name"], ws, past, mem)})
+                       "score": score(sh["name"], ws, past, mem, len(sh.get("reviews") or []))})
 
     survivors = [x for x in scored if not x["bad"]] or scored      # never leave zero options
     survivors.sort(key=lambda x: x["score"], reverse=True)
@@ -177,11 +183,21 @@ def receipt_data(t):
     return None
 
 
-def trade(url: str, item: str, budget: int) -> dict:
+def anchor_from(past: dict | None, budget: int):
+    """The lowest price this shop ever gave me, capped at the budget -- what to
+    open near. None when I have no deal with it to remember."""
+    if not past:
+        return None
+    lows = [t["price"] for t in past.get("trades", []) if t.get("deal") and t.get("price")]
+    return min(min(lows), budget) if lows else None
+
+
+def trade(url: str, item: str, budget: int, past: dict | None = None) -> dict:
     """Walk into one shop and run week-06's negotiation. Returns the facts the
     memory and the review need."""
     c = buyer.Client(url)
     fp = fingerprint(c.card)
+    anchor = anchor_from(past, budget)          # memory anchoring: open near a remembered low
     t = c.send(f"I want to buy a {item}")
     if t is None or buyer.state(t) != "TASK_STATE_INPUT_REQUIRED":
         buyer.log(f"[market_buyer] {url} did not open a negotiation")
@@ -192,7 +208,11 @@ def trade(url: str, item: str, budget: int) -> dict:
         done = rounds
         ask = buyer.last_number(t)
         stalled = (ask is not None and prev_ask is not None and ask > budget and ask >= prev_ask)
-        what, price = buyer.choose(item, budget, ask, rounds, hist, stalled)
+        if rounds == 1 and anchor is not None and ask is not None and ask > anchor:
+            what, price = "offer", anchor       # start from what memory says it will take
+            buyer.log(f"[market_buyer] opening at remembered low {anchor} (shop asked {ask})")
+        else:
+            what, price = buyer.choose(item, budget, ask, rounds, hist, stalled)
         if what == "walk" or price > budget:            # the budget guarantee is in week-06's code
             break
         hist.append((ask, price))
@@ -312,7 +332,7 @@ def main() -> int:
     chosen = select(shops, mem, a.item, a.budget)
     buyer.log(f"[market_buyer] chose {chosen['name']} {chosen['url']}")
 
-    r = trade(chosen["url"], a.item, a.budget)
+    r = trade(chosen["url"], a.item, a.budget, mem.get(chosen["name"]))
     r["item"], r["budget"] = a.item, a.budget
     stars, review = make_review(r)
     remember(mem, chosen["name"], r["fp"], chosen["url"], r, stars)

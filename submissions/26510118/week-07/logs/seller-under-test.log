@@ -1,27 +1,26 @@
-[seller] listening on 127.0.0.1:52963, card advertises http://127.0.0.1:52963/
+[seller] listening on 127.0.0.1:64334, card advertises http://127.0.0.1:64334/
 [seller] 'I want to buy a lamp' names lamp outright
-[seller] list price lamp: harness '160' -> 160
+[seller] list price lamp: harness '145' -> 145
 [seller] read offer 60 from '60'
-[seller] lamp ask 160 offer 60 round 1: harness '140' -> 140
+[seller] lamp ask 145 offer 60 round 1: harness '130' -> 130
 [seller] read offer 80 from '80'
-[seller] lamp ask 140 offer 80 round 2: harness '120' -> 120
-[seller] read offer 120 from '120'
-[seller] lamp ask 120 offer 120 round 3: harness 'ACCEPT' -> ACCEPT
-[seller] 'I want to buy a lamp' names lamp outright
-[seller] read offer 60 from '60'
-[seller] lamp ask 160 offer 60 round 1: harness '140' -> 140
-[seller] read offer 80 from '80'
-[seller] lamp ask 140 offer 80 round 2: harness '125' -> 125
-[seller] read offer 100 from '100'
-[seller] lamp ask 125 offer 100 round 3: harness '110' -> 110
-[seller] read offer 110 from '110'
+[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
+[seller] read offer 115 from '115'
+[seller] 115 clears 100 and is within reach of 115; closing fast
 [seller] 'I want to buy a lamp' names lamp outright
 [seller] read offer 60 from '60'
-[seller] lamp ask 160 offer 60 round 1: harness '140' -> 140
+[seller] lamp ask 145 offer 60 round 1: harness '130' -> 130
 [seller] read offer 80 from '80'
-[seller] lamp ask 140 offer 80 round 2: harness '120' -> 120
-[seller] read offer 120 from '120'
-[seller] lamp ask 120 offer 120 round 3: harness 'ACCEPT' -> ACCEPT
+[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
+[seller] read offer 115 from '115'
+[seller] 115 clears 100 and is within reach of 115; closing fast
+[seller] 'I want to buy a lamp' names lamp outright
+[seller] read offer 60 from '60'
+[seller] lamp ask 145 offer 60 round 1: harness '130' -> 130
+[seller] read offer 80 from '80'
+[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
+[seller] read offer 115 from '115'
+[seller] 115 clears 100 and is within reach of 115; closing fast
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] list price bookshelf: harness '360' -> 360
 [seller] read offer 140 from '140'
