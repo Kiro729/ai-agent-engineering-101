@@ -1,11 +1,14 @@
 [market_buyer] Kit Shop North: stars 1.2988929889298892, score 1.70 [avoided]
-[market_buyer] Kit Shop South: stars 4.66789667896679, score 5.07
-[market_buyer] chose Kit Shop South http://127.0.0.1:57485
-[buyer] card: 'Kit Shop South' via JSONRPC http://127.0.0.1:57485/
+[market_buyer] Kit Shop South: stars 4.66789667896679, score 5.00
+[market_buyer] chose Kit Shop South http://127.0.0.1:57661
+[buyer] card: 'Kit Shop South' via JSONRPC http://127.0.0.1:57661/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
-[buyer] ask 130 budget 120 round 1: harness '100' -> 100
-[buyer] -> '100' taskId=442b8fdc
-[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 100.
-{"shop": "http://127.0.0.1:57485", "receipt": {"task": "442b8fdc-6496-4eef-b550-eb765d991364", "item": "lamp", "sig_seller": "TUtHC4B0gwIkVuDIkXkXCwGwtIYH5Efr2gTuMKXSGChtbk1EJ5hiSusaxOZ3gKiApxKcGNf3K+sq7WvYN8DUAA==", "shop": "Kit Shop South", "price": 100.0}, "stars": 5, "review": "Got it for $100 against a $120 budget in just 1 round, and the receipt matched perfectly."}
+[buyer] ask 130 budget 120 round 1: harness '95' -> 95
+[buyer] -> '95' taskId=68f769e4
+[buyer] <- TASK_STATE_INPUT_REQUIRED | 95 is too low. Counteroffer: 112.
+[buyer] ask 112 budget 120 round 2: harness '103' -> 103
+[buyer] -> '103' taskId=68f769e4
+[buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 103.
+{"shop": "http://127.0.0.1:57661", "receipt": {"task": "68f769e4-ce1c-4166-8dc1-cd719ed4802a", "item": "lamp", "sig_seller": "IlbAiRuzk33DQoS34/md6EByOX3LTVBdmBH0h8s4dXXTH6rWMiZ37aE5LEVRGmtEZCTi7i9lHxdKnDaALBpEDQ==", "shop": "Kit Shop South", "price": 103.0}, "stars": 4, "review": "Got it for $103 against a $120 budget after 2 rounds of negotiation, and the receipt matched the agreed price."}

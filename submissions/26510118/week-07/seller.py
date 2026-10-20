@@ -34,10 +34,15 @@ Run:
 """
 import argparse
 import asyncio
+import base64
+import json
 import math
 import re
+from pathlib import Path
 
 import uvicorn
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from starlette.applications import Starlette
 
 import catalog
@@ -56,6 +61,43 @@ OPENING = 1.3            # fallback first ask, as a multiple of the reserve
 CEILING = 2.0            # an ask above this much of the reserve loses the customer
 MAX_ROUNDS = 4           # rounds before the shop walks away
 CANDIDATES = 8           # catalogue entries put in front of the harness
+
+
+# --- signing the receipt (LAB 2) ---------------------------------------------
+# A receipt is only a claim until it carries the shop's signature. The market
+# verifies sig_seller with the public key registered at join, so the shop must
+# sign with the very key the kit created -- shop_key.pem, loaded, never a fresh
+# one, or a deployed shop's receipts would stop verifying. canon() is byte for
+# byte the market's (sorted keys, no spaces, UTF-8), so both sides sign the same
+# bytes, and the price is signed as an int because a data Part can carry 120 as
+# 120.0.
+_KEY_PATH = Path(__file__).resolve().parent / "shop_key.pem"
+
+
+def _load_key():
+    if _KEY_PATH.exists():
+        return serialization.load_pem_private_key(_KEY_PATH.read_bytes(), password=None)
+    key = Ed25519PrivateKey.generate()
+    _KEY_PATH.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+                                            serialization.PrivateFormat.PKCS8,
+                                            serialization.NoEncryption()))
+    print("[seller] created shop_key.pem (do not commit it)", flush=True)
+    return key
+
+
+_KEY = _load_key()
+
+
+def canon(d: dict) -> bytes:
+    return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def sign_receipt(shop: str, item: str, price: int, task: str) -> dict:
+    """{shop, item, price, task} signed, then sig_seller added -- the five fields
+    the market checks."""
+    rec = {"shop": shop, "item": item, "price": int(price), "task": task}
+    rec["sig_seller"] = base64.b64encode(_KEY.sign(canon(rec))).decode()
+    return rec
 
 PICK_PROMPT = """A customer asked for:
   "{text}"
@@ -250,8 +292,7 @@ class Seller(AgentExecutor):
                 d = "ACCEPT"
             if d == "ACCEPT":
                 await up.add_artifact(parts=[new_data_part(
-                    {"seller": NAME, "item": item["name"], "item_id": item["id"],
-                     "price": offer})], name="receipt")
+                    sign_receipt(NAME, item["name"], offer, task.id))], name="receipt")
                 await up.complete(say(f"Deal: {item['name']} at {offer}."))
                 del self.open[task.id]
                 return
