@@ -32,6 +32,8 @@ the one used across this submission: hard rules in code, judgement to the model.
       -- the old reputation is not handed to whoever is using the name now.
       There is no public key in the list the kit gives us, so this is the best
       available identity check, not a cryptographic one.
+      Round 0 ran week-06's buyer, which has no memory; the wrong receipts it
+      caught are read back from the kit's log into memory (challenge 2).
 
     The review (leave a review either way)
       The harness writes it, so the sentence is natural, but it is fed the real
@@ -82,6 +84,54 @@ def fingerprint(card: dict) -> str:
     return hashlib.sha256(f"{desc}|{skills}".encode("utf-8")).hexdigest()[:10]
 
 
+# ------------------------------------------- what Round 0 taught (challenge 2)
+# Round 0 was run by week-06's buyer.py, which keeps no memory. It did catch
+# shops whose receipt did not match the deal ("the shop closed but its receipt
+# is wrong: receipt price 308.0 is above the 268 that was offered"), but that
+# lesson only exists in the kit's log. Left there, a shop that cheated me stays
+# a candidate as long as strangers rate it well -- elm-street did, at 3.5 stars.
+# So the log is read back into memory: first-hand evidence outranks hearsay.
+
+KIT_LOG = Path(__file__).resolve().parent / "logs" / "market-kit.log"
+_ORDER = re.compile(r"\[order \S+\] (\w+), budget (\d+), round (\d+)")
+_SHOP = re.compile(r"\[kit\] shop for this order: (\S+) ")
+_TASK = re.compile(r"\[buyer\] -> .* taskId=(\w+)")
+_WRONG = re.compile(r"the shop closed but its receipt is wrong: (.*)")
+_OVER = re.compile(r"receipt price ([\d.]+) is above the (\d+) that was offered")
+
+
+def import_round0(mem: dict, log_path: Path = KIT_LOG) -> int:
+    """Fold every wrong receipt week-06's buyer caught in Round 0 into memory,
+    once each (keyed by the A2A task id). Returns how many were new."""
+    try:
+        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return 0
+    known = {t.get("task") for e in mem.values() for t in e.get("trades", [])}
+    added, cur = 0, {}
+    for line in lines:                                  # the kit runs one order at a time
+        if m := _ORDER.search(line):
+            cur = {"item": m[1], "budget": int(m[2])}
+        elif m := _SHOP.search(line):
+            cur["shop"] = m[1]
+        elif m := _TASK.search(line):
+            cur["task"] = m[1]
+        elif (m := _WRONG.search(line)) and cur.get("shop") and cur.get("task") not in known:
+            over = _OVER.search(m[1])
+            e = mem.setdefault(cur["shop"], {"fp": None, "trades": []})   # card never seen: fp unknown
+            e["trades"].append({"item": cur["item"], "budget": cur["budget"],
+                                "price": int(float(over[1])) if over else None,
+                                "agreed": int(over[2]) if over else None, "rounds": None,
+                                "deal": True, "honest": False, "stars": 1,
+                                "task": cur["task"], "src": "round-0 kit log"})
+            e["agg"] = aggregate(e["trades"])
+            known.add(cur["task"])
+            added += 1
+            buyer.log(f"[market_buyer] memory: {cur['shop']} issued a wrong receipt in Round 0 "
+                      f"(task {cur['task']}: {m[1]})")
+    return added
+
+
 # ------------------------------------------------------------- the selection
 
 def weighted_stars(reviews: list) -> float | None:
@@ -99,12 +149,16 @@ def weighted_stars(reviews: list) -> float | None:
     return (num / den) if den else None
 
 
-def is_bad(ws: float | None, past: dict | None) -> bool:
-    """A shop to avoid when a safer one exists: visibly bad reviews, or one my
-    own memory caught issuing a wrong receipt."""
+def why_bad(ws: float | None, past: dict | None) -> str | None:
+    """Why a shop is to be avoided when a safer one exists, or None. My own
+    memory is checked first: a wrong receipt I saw myself outweighs any number
+    of good reviews from buyers I cannot check."""
+    cheated = (past or {}).get("agg", {}).get("cheated", 0)
+    if cheated:
+        return f"my memory: {cheated} wrong receipt(s)"
     if ws is not None and ws < BAD_STARS:
-        return True
-    return bool(past and past.get("agg", {}).get("cheated", 0) > 0)
+        return f"reviews: {ws:.1f} stars"
+    return None
 
 
 def score(name: str, ws: float | None, past: dict | None, mem: dict, n_reviews: int) -> float:
@@ -138,7 +192,7 @@ def select(shops: list, mem: dict, item: str, budget: int):
     for sh in shops:
         ws = weighted_stars(sh.get("reviews"))
         past = mem.get(sh["name"])
-        scored.append({"shop": sh, "ws": ws, "bad": is_bad(ws, past),
+        scored.append({"shop": sh, "ws": ws, "bad": why_bad(ws, past),
                        "score": score(sh["name"], ws, past, mem, len(sh.get("reviews") or []))})
 
     survivors = [x for x in scored if not x["bad"]] or scored      # never leave zero options
@@ -146,7 +200,7 @@ def select(shops: list, mem: dict, item: str, budget: int):
     shortlist = survivors[:SHORTLIST]
     for x in scored:
         buyer.log(f"[market_buyer] {x['shop']['name']}: stars {x['ws']}, score {x['score']:.2f}"
-                  + (" [avoided]" if x["bad"] and len(survivors) < len(scored) else ""))
+                  + (f" [avoided: {x['bad']}]" if x["bad"] and len(survivors) < len(scored) else ""))
 
     if len(shortlist) == 1:
         return shortlist[0]["shop"]
@@ -292,23 +346,30 @@ def make_review(r: dict) -> tuple[int, str]:
 
 # ---------------------------------------------------------------- memory write
 
+def aggregate(trades: list) -> dict:
+    deals = [t for t in trades if t["deal"]]
+    priced = [t for t in deals if t.get("price")]
+    return {
+        "deals": len(deals),
+        "nodeal": sum(1 for t in trades if not t["deal"]),
+        "avg_price_ratio": round(sum(t["price"] / max(1, t["budget"]) for t in priced) / len(priced), 3) if priced else 1.0,
+        "cheated": sum(1 for t in trades if t["honest"] is False),
+    }
+
+
 def remember(mem: dict, name: str, fp: str, url: str, r: dict, stars: int) -> None:
     e = mem.get(name)
+    if e and e.get("fp") is None:                       # learned from the kit log, card never seen: adopt it
+        e["fp"] = fp
     if not e or e.get("fp") != fp:                      # new name, or same name different shop -> fresh entry
         if e and e.get("fp") != fp:
             buyer.log(f"[market_buyer] {name}'s card fingerprint changed; not carrying over old reputation")
-        e = {"fp": fp, "trades": [], "agg": {"deals": 0, "nodeal": 0, "avg_price_ratio": 1.0, "cheated": 0}}
+        e = {"fp": fp, "trades": []}
     e["last_url"] = url
     e["trades"].append({"item": r["item"], "budget": r["budget"], "price": r["price"],
                         "rounds": r["rounds"], "deal": r["deal"], "honest": r["honest"], "stars": stars})
     e["trades"] = e["trades"][-20:]                     # keep memory small
-    deals = [t for t in e["trades"] if t["deal"]]
-    e["agg"] = {
-        "deals": len(deals),
-        "nodeal": sum(1 for t in e["trades"] if not t["deal"]),
-        "avg_price_ratio": round(sum(t["price"] / max(1, t["budget"]) for t in deals) / len(deals), 3) if deals else 1.0,
-        "cheated": sum(1 for t in e["trades"] if t["honest"] is False),
-    }
+    e["agg"] = aggregate(e["trades"])
     mem[name] = e
 
 
@@ -324,6 +385,8 @@ def main() -> int:
     shops = json.loads(Path(a.shops).read_text(encoding="utf-8"))
     mpath = mem_path(a.shops)
     mem = load_mem(mpath)
+    if import_round0(mem):
+        save_mem(mpath, mem)
 
     if not shops:
         print(json.dumps({"shop": "", "receipt": None, "stars": 3, "review": "No shops in the market."}))
