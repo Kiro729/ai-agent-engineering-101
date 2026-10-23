@@ -14,7 +14,7 @@ OPENAI_EXTRA = "{}"                                # extra JSON fields for the O
 MARKET_URL = "https://market.ourolabs.ai"
 MARKET_NAME = "Kiro729"                            # the kit's --name: shop and buyer join under it
 SHOP_URL = "https://kiro-shop.kiro729.workers.dev" # my own shop, never shopped at
-BUYER_ENABLED = "0"                                # "1" once the PC kit is stopped: one buyer at a time
+BUYER_ENABLED = "1"                                # "1" once the PC kit is stopped: one buyer at a time
 
 [ai]
 binding = "AI"
