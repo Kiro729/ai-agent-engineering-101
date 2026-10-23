@@ -1,14 +1,15 @@
 {
- "taken": "2026-10-23 14:45",
+ "taken": "2026-10-23 17:50",
  "session_dates": [
   "2026-10-20",
   "2026-10-20",
+  "2026-10-23",
   "2026-10-23"
  ],
  "shop_rounds": {
   "0": {
    "shop": "Kiro729",
-   "url": "https://soil-brick-points-smooth.trycloudflare.com",
+   "url": "https://kiro-shop.kiro729.workers.dev",
    "deals": 36,
    "share": 0.029,
    "receipts": 36,
@@ -19,7 +20,7 @@
   },
   "1": {
    "shop": "Kiro729",
-   "url": "https://soil-brick-points-smooth.trycloudflare.com",
+   "url": "https://kiro-shop.kiro729.workers.dev",
    "deals": 1,
    "share": 0.001,
    "receipts": 1,
@@ -30,22 +31,22 @@
   },
   "2": {
    "shop": "Kiro729",
-   "url": "https://soil-brick-points-smooth.trycloudflare.com",
-   "deals": 386,
-   "share": 0.003,
-   "receipts": 386,
-   "receipts_with_order": 386,
-   "visits": 502,
-   "reviews": 386,
-   "stars": 4.54
+   "url": "https://kiro-shop.kiro729.workers.dev",
+   "deals": 690,
+   "share": 0.005,
+   "receipts": 690,
+   "receipts_with_order": 690,
+   "visits": 910,
+   "reviews": 690,
+   "stars": 4.51
   }
  },
  "buyer": {
-  "orders": 174,
-  "deals": 116,
-  "paid": 0.862,
-  "saved": 3748,
-  "hopeless": 44
+  "orders": 377,
+  "deals": 232,
+  "paid": 0.866,
+  "saved": 7182,
+  "hopeless": 89
  },
  "market": {
   "0": {
@@ -95,27 +96,42 @@
    }
   },
   "2": {
-   "deals": 122082,
+   "deals": 128400,
    "items": {
     "bookshelf": {
-     "n": 40793,
+     "n": 42850,
      "min": 260,
      "max": 360,
      "mean": 265.3
     },
     "chair": {
-     "n": 40857,
+     "n": 43005,
      "min": 180,
      "max": 250,
      "mean": 183.1
     },
     "lamp": {
-     "n": 40432,
+     "n": 42545,
      "min": 100,
      "max": 140,
      "mean": 102.2
     }
    }
   }
+ },
+ "cloudflare_buyer": {
+  "enabled": true,
+  "busy": true,
+  "shops_remembered": 32,
+  "orders": 155,
+  "since": 1792740653.851,
+  "until": 1792745391.207,
+  "deals": 88,
+  "verified": 88,
+  "feasible": 124,
+  "feasible_deals": 88,
+  "logged": 88,
+  "refused": 0,
+  "broke_off": 0
  }
 }

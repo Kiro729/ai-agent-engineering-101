@@ -10,7 +10,8 @@ describes, and rerunning this after another market session updates them all.
 
     logs/market-kit.log                 the kit's record of every session (buyer, shop, signing)
     logs/challenge-1/ledger-mine.json   this shop's rows of the public ledger (reprice.py)
-    logs/dashboard-snapshot.json        the dashboard, saved by --snapshot
+    logs/dashboard-snapshot.json        the dashboard and the Cloudflare buyer's totals, saved by --snapshot
+    logs/cloudflare-buyer.json          the Cloudflare buyer's status and recent order logs, same moment
     asks.json, test-report.json
 """
 import argparse
@@ -28,6 +29,7 @@ REPORT = HERE / "REPORT.md"
 KIT_LOG = HERE / "logs" / "market-kit.log"
 SNAPSHOT = HERE / "logs" / "dashboard-snapshot.json"
 NAME = "Kiro729"
+CLOUDFLARE = "https://kiro-shop.kiro729.workers.dev"   # the deployed shop and buyer (worker/)
 
 LEDGER = re.compile(r"\[market\] ledger #(\d+): (?:(\w+) at (\d+)|no deal), stars \S+, verified (True|False)")
 JOURNAL = re.compile(r"\[seller\] journal: (\w+) (deal|rejected|walked)(?: at (\d+))? after (\d+) offer")
@@ -90,10 +92,12 @@ def g_sessions(S, snap):
     dates = snap.get("session_dates", [])
     rows = []
     for i, s in enumerate(S):
-        end = f"{s['last']} Ctrl+C" if s["left"] else f"{s['last']} 끊김 (앱 재시작)"
-        rows.append([i + 1, dates[i] if i < len(dates) else "-", s["start"], end,
-                     s["round"], f"`{(s['tunnel'] or '-').replace('https://', '')}`", len(s["orders"])])
-    return table(["세션", "날짜", "시작", "끝", "등록 라운드", "가게 주소 (cloudflared)", "손님 주문"], rows)
+        end = f"{s['last']} Ctrl+C" if s["left"] else f"{s['last']} (종료 줄 없음)"
+        where = (f"`{s['tunnel'].replace('https://', '')}`" if s["tunnel"]
+                 else f"`{CLOUDFLARE.replace('https://', '')}` (--deployed)")
+        rows.append([i + 1, dates[i] if i < len(dates) else "-", s["start"], end, s["round"], where,
+                     len(s["orders"])])
+    return table(["세션", "날짜", "시작", "끝", "등록 라운드", "가게 주소", "손님 주문"], rows)
 
 
 def g_buyer(S, snap):
@@ -215,6 +219,20 @@ def g_ch2_live(S, snap):
                   "maple-home 기억으로 회피", "후기로 회피", "후보로 남음", "둘 중 하나를 고름"], rows)
 
 
+def g_cloudflare(S, snap):
+    cf = snap.get("cloudflare_buyer")
+    if not cf:
+        return "(python make_report.py --snapshot 을 먼저 실행한다)"
+    span = (f"{datetime.fromtimestamp(cf['since']).strftime('%m-%d %H:%M')}-"
+            f"{datetime.fromtimestamp(cf['until']).strftime('%H:%M')}")
+    rows = [[span, cf["orders"], cf["deals"], cf["verified"], cf["feasible"],
+             f"{cf['feasible_deals']} ({cf['feasible_deals'] / max(1, cf['feasible']):.0%})",
+             cf["refused"], cf["broke_off"]]]
+    return (table(["Cloudflare 구매자", "주문", "거래", "서명 검증 통과", "하한가 이상 예산", "그중 성사",
+                   "협상 거부로 떠남", "흥정 끊김"], rows)
+            + f"\n\n`logs/cloudflare-buyer.json`에 그 시점의 집계와 최근 주문 로그를 저장했다 (스냅숏 {snap['taken']}).")
+
+
 def g_test(S, snap):
     r = json.loads((HERE / "test-report.json").read_text(encoding="utf-8"))
     ok = sum(1 for x in r["results"] if x["pass"])
@@ -224,7 +242,7 @@ def g_test(S, snap):
 
 GEN = {"sessions": g_sessions, "buyer": g_buyer, "shop": g_shop, "dashboard": g_dashboard,
        "journal": g_journal, "signing": g_signing, "asks": g_asks,
-       "ch2-incidents": g_ch2_incidents, "ch2-live": g_ch2_live, "test": g_test}
+       "ch2-incidents": g_ch2_incidents, "ch2-live": g_ch2_live, "cloudflare": g_cloudflare, "test": g_test}
 
 
 # ------------------------------------------------------------ the snapshot
@@ -241,6 +259,8 @@ def snapshot(S) -> None:
             seq = next((o["seq"] for o in s["orders"] if o.get("seq")), None)
             p = c.get(f"{reprice.MARKET}/api/ledger", params={"after": seq - 1}).json() if seq else []
             dates.append(datetime.fromtimestamp(p[0]["ts"]).strftime("%Y-%m-%d") if p else "-")
+        cf_status = c.get(f"{CLOUDFLARE}/buyer/status").json()
+        cf_log = c.get(f"{CLOUDFLARE}/buyer/log", params={"n": 10}).json()
     shop_rounds = {r: next((x for x in R["shops"] if x["shop"] == NAME), None)
                    for r, R in stats["rounds"].items()}
     buyer = next(x for x in board["buyers"] if x["name"] == NAME)
@@ -249,8 +269,11 @@ def snapshot(S) -> None:
         "shop_rounds": {r: x for r, x in shop_rounds.items() if x},
         "buyer": {k: buyer[k] for k in ("orders", "deals", "paid", "saved", "hopeless")},
         "market": {r: {"deals": R["deals"], "items": R["items"]} for r, R in stats["rounds"].items()},
+        "cloudflare_buyer": {k: v for k, v in cf_status.items() if k != "recent"},
     }, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"saved {SNAPSHOT.relative_to(HERE)}")
+    (HERE / "logs" / "cloudflare-buyer.json").write_text(json.dumps(
+        {"status": cf_status, "recent_orders_with_log": cf_log}, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"saved {SNAPSHOT.relative_to(HERE)} and logs/cloudflare-buyer.json")
 
 
 def main() -> int:

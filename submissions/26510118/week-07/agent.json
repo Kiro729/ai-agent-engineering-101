@@ -8,5 +8,6 @@
   },
   "market_buyer": {
     "cmd": "python market_buyer.py --shops {shops} --item {item} --budget {budget}"
-  }
+  },
+  "deployed": "https://kiro-shop.kiro729.workers.dev"
 }
