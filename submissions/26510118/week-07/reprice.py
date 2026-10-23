@@ -10,7 +10,7 @@ every result names the shop, the receipt, and the buyer's stars and review,
 and the order before it carries the buyer's budget. So it holds this shop's
 own trades and reviews *and* what each customer could have paid, which the
 shop never sees while it negotiates. Only this shop's results are kept, in
-.market/ledger-mine.json, so a window is read once.
+logs/challenge-1/ledger-mine.json, so a window is read once.
 
 What the trades and reviews said before the change (Rounds 0-2):
     every list price (lamp 150, chair 270, bookshelf 340-370) sat above the
@@ -49,7 +49,7 @@ ITEMS = ("lamp", "chair", "bookshelf")
 STAR_SLACK = 0.2                    # stars the shop may give up, against the best price, for profit
 MIN_CUSTOMERS = 5                   # fewer than this and the harness keeps setting the list price
 HERE = Path(__file__).resolve().parent
-CACHE = HERE / ".market" / "ledger-mine.json"
+CACHE = HERE / "logs" / "challenge-1" / "ledger-mine.json"   # public ledger rows, kept as evidence
 ASKS = HERE / "asks.json"
 
 
@@ -122,6 +122,7 @@ def scan(cache: dict, since: float, until: float | None) -> dict:
                             "seq": e["seq"], "ts": e["ts"], "round": e["round"], "buyer": d.get("buyer"),
                             "item": o.get("item") or (rec or {}).get("item"), "budget": o.get("budget"),
                             "price": (rec or {}).get("price"), "counted": counted,
+                            "verified": bool(d.get("verified")),
                             "stars": d.get("stars"), "review": d.get("review")})
                 win["to_ts"] = e["ts"]
             if not p:
@@ -222,26 +223,39 @@ def reprice(cache: dict) -> dict:
 
 # ------------------------------------------------------------------ the report
 
-def report(cache: dict, changed_at: float | None) -> None:
-    """Share and average price, per round, before and after the change."""
-    def when(t):
-        return datetime.fromtimestamp(t).strftime("%m-%d %H:%M")
-    print(f"\n{'window':<24} {'round':>5} {'visits':>6} {'deals':>5} {'share':>8} "
-          f"{'price/reserve':>13} {'paid/budget':>11} {'stars':>11}")
+def report_rows(cache: dict, changed_at: float | None) -> list[dict]:
+    """Share and average price, per window and round, labelled before or after
+    the change. make_report.py prints the same rows into REPORT.md."""
+    rows = []
     for w in cache["windows"]:
-        tag = ("after" if changed_at and w["from_ts"] >= changed_at else "before")
         for rnd in sorted(w["market_results"]):
             mine = [r for r in cache["results"] if w["from_ts"] <= r["ts"] <= w["to_ts"] and str(r["round"]) == rnd]
             if not mine:
                 continue
             deals = [r for r in mine if r["counted"] and r["price"]]
-            share = len(deals) / max(1, w["market_deals"].get(rnd, 0))
-            pr = statistics.fmean(r["price"] / reserve_of(r["item"]) for r in deals) if deals else 0
-            pb = statistics.fmean(r["price"] / r["budget"] for r in deals if r["budget"]) if deals else 0
-            st = [r["stars"] for r in mine if isinstance(r["stars"], (int, float))]
-            print(f"{tag + ' ' + when(w['from_ts']) + '-' + when(w['to_ts'])[6:]:<24} {rnd:>5} {len(mine):>6} "
-                  f"{len(deals):>5} {share:>8.3%} {pr:>13.3f} {pb:>11.3f} "
-                  f"{(f'{statistics.fmean(st):.2f} ({len(st)})' if st else '-'):>11}")
+            stars = [r["stars"] for r in mine if isinstance(r["stars"], (int, float))]
+            rows.append({
+                "tag": "after" if changed_at and w["from_ts"] >= changed_at else "before",
+                "from": datetime.fromtimestamp(w["from_ts"]).strftime("%m-%d %H:%M"),
+                "to": datetime.fromtimestamp(w["to_ts"]).strftime("%H:%M"),
+                "round": rnd, "visits": len(mine), "deals": len(deals),
+                "share": len(deals) / max(1, w["market_deals"].get(rnd, 0)),
+                "price_reserve": statistics.fmean(r["price"] / reserve_of(r["item"]) for r in deals) if deals else None,
+                "paid_budget": statistics.fmean(r["price"] / r["budget"] for r in deals if r["budget"]) if deals else None,
+                "stars": statistics.fmean(stars) if stars else None, "reviews": len(stars)})
+    return rows
+
+
+def report(cache: dict, changed_at: float | None) -> None:
+    def f3(v):
+        return f"{v:.3f}" if v is not None else "-"
+    print(f"\n{'window':<24} {'round':>5} {'visits':>6} {'deals':>5} {'share':>8} "
+          f"{'price/reserve':>13} {'paid/budget':>11} {'stars':>11}")
+    for r in report_rows(cache, changed_at):
+        stars = f"{r['stars']:.2f} ({r['reviews']})" if r["stars"] is not None else "-"
+        print(f"{r['tag'] + ' ' + r['from'] + '-' + r['to']:<24} {r['round']:>5} {r['visits']:>6} "
+              f"{r['deals']:>5} {r['share']:>8.3%} {f3(r['price_reserve']):>13} {f3(r['paid_budget']):>11} "
+              f"{stars:>11}")
 
 
 def main() -> int:

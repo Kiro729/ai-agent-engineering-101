@@ -1,0 +1,121 @@
+{
+ "taken": "2026-10-23 14:45",
+ "session_dates": [
+  "2026-10-20",
+  "2026-10-20",
+  "2026-10-23"
+ ],
+ "shop_rounds": {
+  "0": {
+   "shop": "Kiro729",
+   "url": "https://soil-brick-points-smooth.trycloudflare.com",
+   "deals": 36,
+   "share": 0.029,
+   "receipts": 36,
+   "receipts_with_order": 36,
+   "visits": 61,
+   "reviews": 0,
+   "stars": null
+  },
+  "1": {
+   "shop": "Kiro729",
+   "url": "https://soil-brick-points-smooth.trycloudflare.com",
+   "deals": 1,
+   "share": 0.001,
+   "receipts": 1,
+   "receipts_with_order": 1,
+   "visits": 6,
+   "reviews": 1,
+   "stars": 2.0
+  },
+  "2": {
+   "shop": "Kiro729",
+   "url": "https://soil-brick-points-smooth.trycloudflare.com",
+   "deals": 386,
+   "share": 0.003,
+   "receipts": 386,
+   "receipts_with_order": 386,
+   "visits": 502,
+   "reviews": 386,
+   "stars": 4.54
+  }
+ },
+ "buyer": {
+  "orders": 174,
+  "deals": 116,
+  "paid": 0.862,
+  "saved": 3748,
+  "hopeless": 44
+ },
+ "market": {
+  "0": {
+   "deals": 1252,
+   "items": {
+    "bookshelf": {
+     "n": 390,
+     "min": 260,
+     "max": 388,
+     "mean": 297.6
+    },
+    "chair": {
+     "n": 425,
+     "min": 180,
+     "max": 269,
+     "mean": 205.3
+    },
+    "lamp": {
+     "n": 437,
+     "min": 100,
+     "max": 140,
+     "mean": 113.7
+    }
+   }
+  },
+  "1": {
+   "deals": 1812,
+   "items": {
+    "bookshelf": {
+     "n": 589,
+     "min": 260,
+     "max": 360,
+     "mean": 282.1
+    },
+    "chair": {
+     "n": 617,
+     "min": 180,
+     "max": 250,
+     "mean": 194.7
+    },
+    "lamp": {
+     "n": 606,
+     "min": 100,
+     "max": 140,
+     "mean": 108.1
+    }
+   }
+  },
+  "2": {
+   "deals": 122082,
+   "items": {
+    "bookshelf": {
+     "n": 40793,
+     "min": 260,
+     "max": 360,
+     "mean": 265.3
+    },
+    "chair": {
+     "n": 40857,
+     "min": 180,
+     "max": 250,
+     "mean": 183.1
+    },
+    "lamp": {
+     "n": 40432,
+     "min": 100,
+     "max": 140,
+     "mean": 102.2
+    }
+   }
+  }
+ }
+}
