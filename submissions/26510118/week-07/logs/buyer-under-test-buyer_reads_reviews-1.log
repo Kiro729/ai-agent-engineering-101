@@ -1,11 +1,11 @@
 [market_buyer] Kit Shop North: stars 1.2988929889298892, score 1.52 [avoided: reviews: 1.3 stars]
 [market_buyer] Kit Shop South: stars 4.66789667896679, score 4.82
-[market_buyer] chose Kit Shop South http://127.0.0.1:55199
-[buyer] card: 'Kit Shop South' via JSONRPC http://127.0.0.1:55199/
+[market_buyer] chose Kit Shop South http://127.0.0.1:56676
+[buyer] card: 'Kit Shop South' via JSONRPC http://127.0.0.1:56676/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
 [market_buyer] opening at remembered low 100 (shop asked 130)
-[buyer] -> '100' taskId=4879c444
+[buyer] -> '100' taskId=d06774d0
 [buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 100.
-{"shop": "http://127.0.0.1:55199", "receipt": {"task": "4879c444-020a-4ce8-9f29-247729f6b1cb", "item": "lamp", "sig_seller": "sP+tGkwyM6F48fqhwWBkC/s9k6Bl1K4tGRZeF92AeNVeNxuybXOC8jnYSFfShGJ8GORE/W+D6tEZIJZLpbhuCQ==", "shop": "Kit Shop South", "price": 100.0}, "stars": 3, "review": "Deal closed in 1 round at $100.00 against a $120 budget with no discount off the budget, and the receipt matched."}
+{"shop": "http://127.0.0.1:56676", "receipt": {"task": "d06774d0-d07c-4cdd-8b72-c62fe249156f", "item": "lamp", "sig_seller": "voVt8rmTJO6+EHdecQ6Veymj+zoHmf1LSFpcs4oK8o9MaFfuE7H8HXoTPl497t4M92hdxg+fUAVc18fr6+1IDQ==", "shop": "Kit Shop South", "price": 100.0}, "stars": 3, "review": "Paid the full budget of $120... wait, $100 against a $120 budget in 1 round with the receipt matching, but no discount was negotiated so it's just an average deal."}

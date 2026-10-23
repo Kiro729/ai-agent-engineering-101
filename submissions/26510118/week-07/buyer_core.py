@@ -11,8 +11,9 @@ clamps its reserve: a model cannot promise it. Four guards sit around whatever
 the harness answers -- nothing above the budget is ever sent, a price already
 within budget is never walked away from, the clock closes the deal, and a shop
 that has stopped moving is left without asking. One exception to the second:
-a shop that will not come down from a price above the market floor is refusing
-to negotiate, so the buyer leaves, reviews it 2 stars and avoids it after.
+a shop that twice in a row will not come down from a price above the market
+floor (3% over it still counts as the floor) is refusing to negotiate, so the
+buyer leaves, reviews it 2 stars and avoids it after.
 
 Choosing a shop (from reviews and memory):
     code      drops shops that are clearly bad -- verified-looking bad
@@ -54,6 +55,9 @@ RECENT = 5            # a shop that broke off 2 of my last 5 trades with it (hun
 # The market's reserves, the same for every shop (the market test's RESERVE and
 # the dashboard's minimum prices): no shop may sell below them.
 FLOORS = {"lamp": 100, "chair": 180, "bookshelf": 260}
+FLOOR_TOLERANCE = 1.03  # within 3% of the floor counts as the floor: that is the market's own average
+                        # (102, 183, 265 on 10-23), so a shop holding there is fair, not stubborn
+REFUSE_AFTER = 2      # holds in a row above that before it is a refusal; one repeat can be a tactic
 REFUSED_STARS = 2     # a shop that will not move from a price above the floor; 1 stays for a wrong receipt
 
 
@@ -145,26 +149,28 @@ def _answer(out: str, fallback):
     return int(m.group(1)) if m else fallback
 
 
-async def choose(ask, item: str, budget: int, price_asked, rounds: int, hist, holding: bool, started: float):
-    """-> ('accept', price) | ('offer', price) | ('walk', None), guards applied.
-    `holding`: the shop's ask did not come down since my last offer. The cases
-    above the harness call are facts, not judgements."""
+async def choose(ask, item: str, budget: int, price_asked, rounds: int, hist, holds: int, started: float):
+    """-> ('accept', price) | ('offer', price) | ('walk', None) | ('refuse', None),
+    guards applied. `holds`: rounds in a row the shop's ask has not come down
+    after my offer. The cases above the harness call are facts, not judgements."""
     within = price_asked is not None and price_asked <= budget
+    holding = holds >= 1
     if within and rounds >= MAX_ROUNDS:
         log(f"[buyer] last round and {price_asked} fits {budget}; taking it")
         return "accept", price_asked
     if within and holding:
-        # The shop did not come down after my offer. At the market's floor
-        # there is nothing left to come down to -- Ssadassa Shop held at 100
-        # for a lamp, which no shop may go below -- so that is simply the best
-        # price there is. Above the floor it is a refusal to negotiate: leave
-        # at once, and the review and the memory say so.
+        # The shop did not come down after my offer. At the market's floor (or
+        # its average, just above) there is nothing fair left to come down to
+        # -- Ssadassa Shop held at 100 for a lamp, which no shop may go below
+        # -- so that is simply a good price. Above it, holding twice in a row
+        # is a refusal to negotiate: leave, and the review and memory say so.
         floor = FLOORS.get(item)
-        if floor is not None and price_asked <= floor:
-            log(f"[buyer] {price_asked} is the market floor for a {item} and fits {budget}; taking it")
+        if floor is not None and price_asked <= int(floor * FLOOR_TOLERANCE):
+            log(f"[buyer] {price_asked} is at the market floor for a {item} and fits {budget}; taking it")
             return "accept", price_asked
-        log(f"[buyer] {price_asked} fits {budget} but the shop will not negotiate above the floor; leaving")
-        return "refuse", None
+        if holds >= REFUSE_AFTER:
+            log(f"[buyer] {price_asked} fits {budget} but the shop held {holds} times above the floor; leaving")
+            return "refuse", None
     if not within and holding:
         log(f"[buyer] {price_asked} is over {budget} and not moving; leaving")
         return "walk", None
@@ -329,16 +335,17 @@ async def trade(client, ask, url: str, item: str, budget: int, past: dict | None
             log(f"[market_buyer] {url} did not open a negotiation")
             return r
 
-        task_id, hist, prev_ask, last_offer = t["id"], [], None, None
+        task_id, hist, prev_ask, last_offer, holds = t["id"], [], None, None, 0
         for rounds in range(1, MAX_ROUNDS + 1):
             r["rounds"] = rounds
             asked = await last_number(t, ask)
             holding = asked is not None and prev_ask is not None and asked >= prev_ask
+            holds = holds + 1 if holding else 0
             if rounds == 1 and anchor is not None and asked is not None and asked > anchor:
                 what, price = "offer", anchor       # start from what memory says it will take
                 log(f"[market_buyer] opening at remembered low {anchor} (shop asked {asked})")
             else:
-                what, price = await choose(ask, item, budget, asked, rounds, hist, holding, started)
+                what, price = await choose(ask, item, budget, asked, rounds, hist, holds, started)
             if what == "refuse":
                 r["refused"], r["held_at"] = True, asked
                 break
