@@ -190,12 +190,40 @@ async def pick_item(text: str):
 
 _LIST_PRICE: dict[str, int] = {}
 
+# Challenge 1: reprice.py reads this shop's own trades and reviews from the
+# market ledger and writes asks.json. Those asks replace the harness's list
+# price for the items they cover. The file is re-read whenever it changes, so
+# a reprice takes effect without restarting the kit, which would change the
+# tunnel URL. The reserve still clamps whatever the file says.
+_ASKS_PATH = Path(__file__).resolve().parent / "asks.json"
+_asks = {"mtime": None, "asks": {}}
+
+
+def repriced(item_id: str) -> int | None:
+    try:
+        mtime = _ASKS_PATH.stat().st_mtime
+    except OSError:
+        return None
+    if mtime != _asks["mtime"]:
+        try:
+            asks = json.loads(_ASKS_PATH.read_text(encoding="utf-8")).get("asks", {})
+        except Exception:                               # noqa: BLE001  (half-written file -> keep the old asks)
+            return _asks["asks"].get(item_id)
+        _asks.update(mtime=mtime, asks=asks)
+        print(f"[seller] asks.json loaded: {asks}", flush=True)
+    a = _asks["asks"].get(item_id)
+    return int(a) if isinstance(a, (int, float)) else None
+
 
 async def list_price(item: dict) -> int:
     """Decided by the harness once per item, then reused: a shop quotes the
     same price to the next customer, and an early version that asked every
-    time produced 250, then 160, then 250 for the same lamp."""
+    time produced 250, then 160, then 250 for the same lamp. An item repriced
+    from the shop's own records (asks.json) skips the harness."""
     key = item["id"]
+    fixed = repriced(key)
+    if fixed is not None:
+        return _clamp(item["reserve"], fixed)
     if key not in _LIST_PRICE:
         reserve = item["reserve"]
         out = await asyncio.to_thread(harness.ask, OPEN_PROMPT.format(
