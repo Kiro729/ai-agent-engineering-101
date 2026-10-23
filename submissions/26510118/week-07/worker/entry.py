@@ -467,11 +467,22 @@ class Buyer(DurableObject):
         if env_str(self.env, "BUYER_ENABLED") != "1":
             return json.dumps({"enabled": False})
         self._setup()
-        recent = [{k: v for k, v in json.loads(r["j"]).items() if k != "log"}
-                  for r in rows(self.sql.exec("SELECT j FROM orders ORDER BY t DESC LIMIT 20"))]
-        n = rows(self.sql.exec("SELECT COUNT(*) AS n FROM orders"))[0]["n"]
+        every = [(r["t"], json.loads(r["j"])) for r in rows(self.sql.exec("SELECT t, j FROM orders ORDER BY t"))]
+        floors = buyer_core.FLOORS
+        feasible = [o for _, o in every if o["budget"] >= floors.get(o["item"], 0)]
+        logged = [o for _, o in every if o.get("log")]
+        totals = {
+            "orders": len(every), "since": every[0][0] if every else None, "until": every[-1][0] if every else None,
+            "deals": sum(1 for _, o in every if o["deal"] != "no deal"),
+            "verified": sum(1 for _, o in every if o.get("verified")),
+            "feasible": len(feasible), "feasible_deals": sum(1 for o in feasible if o["deal"] != "no deal"),
+            "logged": len(logged),
+            "refused": sum(1 for o in logged if any("held" in l and "leaving" in l for l in o["log"])),
+            "broke_off": sum(1 for o in logged if any("broke off" in l for l in o["log"])),
+        }
+        recent = [{k: v for k, v in o.items() if k != "log"} for _, o in every[-20:][::-1]]
         return json.dumps({"enabled": env_str(self.env, "BUYER_ENABLED") == "1", "busy": self.busy,
-                           "orders": n, "shops_remembered": len(self.mem), "recent": recent})
+                           "shops_remembered": len(self.mem), **totals, "recent": recent})
 
     async def order_log(self, n: int) -> str:
         """The last n orders with their log lines, newest first."""
