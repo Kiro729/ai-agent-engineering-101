@@ -29,7 +29,7 @@ import json
 import time
 import uuid
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from js import AbortSignal, Object, fetch
 from pyodide.ffi import to_js
@@ -375,8 +375,19 @@ class Buyer(DurableObject):
             return False
 
     async def handle(self, o: dict) -> None:
-        """One order, as the kit's handle_order does it for Round 1 and later."""
-        print(f"[order {o['order']}] {o['item']}, budget {o['budget']}, round {o['round']}", flush=True)
+        """One order, as the kit's handle_order does it for Round 1 and later. Its
+        log lines are kept with the order (GET /buyer/log), because a cron
+        run's lines do not reach `wrangler tail` -- they stand in for the kit's
+        market-kit.log."""
+        buyer_core._sink = []
+        try:
+            await self._handle(o)
+        finally:
+            buyer_core._sink = None
+
+    async def _handle(self, o: dict) -> None:
+        say = buyer_core.log
+        say(f"[order {o['order']}] {o['item']}, budget {o['budget']}, round {o['round']}")
         status, data = await self.market("GET", "/api/shops")
         own = env_str(self.env, "SHOP_URL").rstrip("/")
         shops = [s for s in data.get("shops", []) if s["url"].rstrip("/") != own]
@@ -395,29 +406,30 @@ class Buyer(DurableObject):
                 "stars": out.get("stars"), "review": out.get("review")}
         if isinstance(receipt, dict):
             if not receipt.get("sig_seller"):
-                print("[sign] receipt has no sig_seller", flush=True)
+                say("[sign] receipt has no sig_seller")
             elif shop_url not in pubkeys:
-                print(f"[sign] {shop_url} is not a registered shop", flush=True)
+                say(f"[sign] {shop_url} is not a registered shop")
             elif not self._verify_seller(pubkeys[shop_url], receipt):
-                print("[sign] sig_seller does not verify with the shop's registered key", flush=True)
+                say("[sign] sig_seller does not verify with the shop's registered key")
             elif receipt.get("item") != o["item"] or not isinstance(receipt.get("price"), int) \
                     or receipt["price"] > o["budget"]:
-                print(f"[sign] receipt {receipt.get('item')} at {receipt.get('price')} does not fit the order, "
-                      f"not signing", flush=True)
+                say(f"[sign] receipt {receipt.get('item')} at {receipt.get('price')} does not fit the order, "
+                    f"not signing")
             else:
                 signed = dict({k: receipt[k] for k in RECEIPT_KEYS}, order=o["order"])
                 body["sig_buyer"] = base64.b64encode(self.key.sign(canon(signed))).decode()
-                print("[sign] sig_seller ok, sig_buyer added", flush=True)
+                say("[sign] sig_seller ok, sig_buyer added")
         status, res = await self.market("POST", "/api/results", body)
         if status != 200:
-            print(f"[market] result refused: {status} {str(res)[:200]}", flush=True)
-            return
+            say(f"[market] result refused: {status} {str(res)[:200]}")
+            res = {}
         deal = f"{receipt.get('item')} at {receipt.get('price')}" if isinstance(receipt, dict) else "no deal"
-        print(f"[market] ledger #{res.get('ledger')}: {deal}, stars {out.get('stars')}, "
-              f"verified {res.get('verified')}", flush=True)
+        if res:
+            say(f"[market] ledger #{res.get('ledger')}: {deal}, stars {out.get('stars')}, verified {res.get('verified')}")
         self.sql.exec("INSERT INTO orders (t, j) VALUES (?, ?)", time.time(), json.dumps({
             "order": o["order"], "item": o["item"], "budget": o["budget"], "shop": shop_url, "deal": deal,
-            "stars": out.get("stars"), "ledger": res.get("ledger"), "verified": res.get("verified")}))
+            "stars": out.get("stars"), "ledger": res.get("ledger"), "verified": res.get("verified"),
+            "log": [line for line in buyer_core._sink if ": stars " not in line][-60:]}))
 
     async def tick(self) -> str:
         """Take orders for about WINDOW seconds. A tick that finds the last one
@@ -455,10 +467,17 @@ class Buyer(DurableObject):
         if env_str(self.env, "BUYER_ENABLED") != "1":
             return json.dumps({"enabled": False})
         self._setup()
-        recent = [json.loads(r["j"]) for r in rows(self.sql.exec("SELECT j FROM orders ORDER BY t DESC LIMIT 20"))]
+        recent = [{k: v for k, v in json.loads(r["j"]).items() if k != "log"}
+                  for r in rows(self.sql.exec("SELECT j FROM orders ORDER BY t DESC LIMIT 20"))]
         n = rows(self.sql.exec("SELECT COUNT(*) AS n FROM orders"))[0]["n"]
         return json.dumps({"enabled": env_str(self.env, "BUYER_ENABLED") == "1", "busy": self.busy,
                            "orders": n, "shops_remembered": len(self.mem), "recent": recent})
+
+    async def order_log(self, n: int) -> str:
+        """The last n orders with their log lines, newest first."""
+        self._setup()
+        return json.dumps([json.loads(r["j"]) for r in rows(
+            self.sql.exec("SELECT j FROM orders ORDER BY t DESC LIMIT ?", max(1, min(int(n), 50))))], indent=1)
 
 
 # ------------------------------------------------------------ the entry point
@@ -483,6 +502,11 @@ class Default(WorkerEntrypoint):
                             "examples": ["I want to buy a lamp", "90"]}],
             }
             return Response(json.dumps(card), headers={"content-type": "application/json"})
+        if u.path == "/buyer/log":
+            n = parse_qs(u.query).get("n", ["5"])[0]
+            stub = self.env.BUYER.get(self.env.BUYER.idFromName("buyer"))
+            return Response(await stub.order_log(int(n) if n.isdigit() else 5),
+                            headers={"content-type": "application/json"})
         if u.path == "/buyer/status":
             stub = self.env.BUYER.get(self.env.BUYER.idFromName("buyer"))
             return Response(await stub.status(), headers={"content-type": "application/json"})
