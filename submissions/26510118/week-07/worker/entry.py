@@ -140,7 +140,12 @@ class Shop(DurableObject):
             return
         self.sql = self.ctx.storage.sql
         self.sql.exec("CREATE TABLE IF NOT EXISTS journal (j TEXT)")
-        self.sql.exec("CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, j TEXT, t REAL)")
+        # Tasks live in this object's memory, not in SQL: one object serves
+        # every message, so memory is already consistent, and writing every
+        # message (and sweeping the table on every request) would spend the
+        # free plan's daily rows in hours. Only the journal is stored.
+        self.sql.exec("DROP TABLE IF EXISTS tasks")
+        self.tasks: dict[str, dict] = {}                # task id -> {"task", "t"}; deals are in self.open
         episodes = [json.loads(r["j"]) for r in rows(self.sql.exec("SELECT j FROM journal"))]
         if not episodes:                                # first start: carry the PC's memory over
             for ep in EPISODES:
@@ -166,24 +171,18 @@ class Shop(DurableObject):
         return market_anchor.mean_of(self.stats["items"], item_id)
 
     def _save(self, task: dict, deal: dict | None) -> None:
-        d = None if deal is None else {**deal, "item": deal["item"]["id"]}   # the item is rebuilt from its id
-        self.sql.exec("INSERT OR REPLACE INTO tasks (id, j, t) VALUES (?, ?, ?)",
-                      task["id"], json.dumps({"task": task, "deal": d}), time.time())
+        self.tasks[task["id"]] = {"task": task, "t": time.time()}
 
     def _load(self, tid: str):
-        found = rows(self.sql.exec("SELECT j FROM tasks WHERE id = ?", tid))
-        if not found:
-            return None, None
-        row = json.loads(found[0]["j"])
-        deal = row["deal"]
-        if deal:
-            deal["item"] = catalog.by_id(deal["item"])
-        return row["task"], self.open.get(tid) or deal
+        row = self.tasks.get(tid)
+        return (row["task"], self.open.get(tid)) if row else (None, None)
 
     def _sweep(self) -> None:
         for tid in self.shop.stale(self.open):
             self.shop.walked(self.open.pop(tid))
-        self.sql.exec("DELETE FROM tasks WHERE t < ?", time.time() - KEEP_TASKS)
+        cutoff = time.time() - KEEP_TASKS
+        for tid in [t for t, row in self.tasks.items() if row["t"] < cutoff]:
+            del self.tasks[tid]
 
     async def rpc(self, body: str) -> str:
         self._setup()
