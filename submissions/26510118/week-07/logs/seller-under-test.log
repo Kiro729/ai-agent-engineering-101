@@ -1,48 +1,35 @@
-[seller] listening on 127.0.0.1:64334, card advertises http://127.0.0.1:64334/
+[seller] listening on 127.0.0.1:51000, card advertises http://127.0.0.1:51000/
 [seller] 'I want to buy a lamp' names lamp outright
-[seller] list price lamp: harness '145' -> 145
-[seller] read offer 60 from '60'
-[seller] lamp ask 145 offer 60 round 1: harness '130' -> 130
-[seller] read offer 80 from '80'
-[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
-[seller] read offer 115 from '115'
-[seller] 115 clears 100 and is within reach of 115; closing fast
+[seller] asks.json loaded: {'lamp': 104, 'chair': 191, 'bookshelf': 276}
+[seller] read offer 104 from '104'
+[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT
 [seller] 'I want to buy a lamp' names lamp outright
-[seller] read offer 60 from '60'
-[seller] lamp ask 145 offer 60 round 1: harness '130' -> 130
-[seller] read offer 80 from '80'
-[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
-[seller] read offer 115 from '115'
-[seller] 115 clears 100 and is within reach of 115; closing fast
+[seller] read offer 104 from '104'
+[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT
 [seller] 'I want to buy a lamp' names lamp outright
-[seller] read offer 60 from '60'
-[seller] lamp ask 145 offer 60 round 1: harness '130' -> 130
-[seller] read offer 80 from '80'
-[seller] lamp ask 130 offer 80 round 2: harness '115' -> 115
-[seller] read offer 115 from '115'
-[seller] 115 clears 100 and is within reach of 115; closing fast
+[seller] read offer 104 from '104'
+[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT
 [seller] 'I want to buy a bookshelf' names bookshelf outright
-[seller] list price bookshelf: harness '360' -> 360
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 360 offer 140 round 1: harness '320' -> 320
+[seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 320 offer 170 round 2: harness '290' -> 290
+[seller] bookshelf ask 268 offer 170 round 2: harness '262' -> 262
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 290 offer 200 round 3: harness '270' -> 270
+[seller] bookshelf ask 262 offer 200 round 3: harness '265' -> 265
 [seller] read offer 230 from '230'
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 360 offer 140 round 1: harness '320' -> 320
+[seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 320 offer 170 round 2: harness '290' -> 290
+[seller] bookshelf ask 268 offer 170 round 2: harness '262' -> 262
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 290 offer 200 round 3: harness '270' -> 270
+[seller] bookshelf ask 262 offer 200 round 3: harness '264' -> 264
 [seller] read offer 230 from '230'
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 360 offer 140 round 1: harness '320' -> 320
+[seller] bookshelf ask 276 offer 140 round 1: harness '265' -> 265
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 320 offer 170 round 2: harness '290' -> 290
+[seller] bookshelf ask 265 offer 170 round 2: harness '245' -> 245
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 290 offer 200 round 3: harness '270' -> 270
+[seller] bookshelf already at the floor 260; holding without asking
 [seller] read offer 230 from '230'

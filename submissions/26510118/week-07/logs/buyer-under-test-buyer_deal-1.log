@@ -1,10 +1,14 @@
+[market_buyer] memory: maple-home issued a wrong receipt in Round 0 (task f723989f: receipt price 127.0 is above the 112 that was offered)
+[market_buyer] memory: maple-home issued a wrong receipt in Round 0 (task d2aa8118: receipt price 117.0 is above the 102 that was offered)
+[market_buyer] memory: elm-street issued a wrong receipt in Round 0 (task fe8b6296: receipt price 308.0 is above the 268 that was offered)
+[market_buyer] memory: maple-home issued a wrong receipt in Round 0 (task a107df45: receipt price 213.0 is above the 188 that was offered)
 [market_buyer] Kit Shop: stars None, score 3.33
-[market_buyer] chose Kit Shop http://127.0.0.1:60322
-[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:60322/
+[market_buyer] chose Kit Shop http://127.0.0.1:64354
+[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:64354/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
 [market_buyer] opening at remembered low 100.0 (shop asked 130)
-[buyer] -> '100.0' taskId=152a738d
+[buyer] -> '100.0' taskId=08c79288
 [buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 100.
-{"shop": "http://127.0.0.1:60322", "receipt": {"task": "152a738d-5a88-4737-b5e8-6bcaf7bbce84", "item": "lamp", "sig_seller": "h+58hCNZFo/JPFj+g83MUYH0h7Y15mBjjxppwvpEvpHaUmeuP7s4xsQ4WLxntEiAo1gjQ27OPtuZRRznQtelCQ==", "shop": "Kit Shop", "price": 100.0}, "stars": 3, "review": "Closed in 1 round at $100.00 against a $120 budget with no discount, but the receipt matched what was agreed."}
+{"shop": "http://127.0.0.1:64354", "receipt": {"task": "08c79288-6b83-4441-98dc-255c6126ee2c", "item": "lamp", "sig_seller": "ucG1jfE1XXO4nC/udEpB1RUmjyPewbrvPSrI/LSGRdqlooWYp3pm+5HS+ozrNxyi6XzYMo8heqaDSxFAsVYWDw==", "shop": "Kit Shop", "price": 100.0}, "stars": 3, "review": "Deal closed in 1 round at $100.00 against a $120 budget with no discount off budget, and the receipt matched."}

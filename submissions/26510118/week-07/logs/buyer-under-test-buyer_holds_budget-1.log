@@ -1,14 +1,14 @@
 [market_buyer] Kit Shop: stars None, score 3.33
-[market_buyer] chose Kit Shop http://127.0.0.1:60383
-[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:60383/
+[market_buyer] chose Kit Shop http://127.0.0.1:64414
+[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:64414/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a bookshelf'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | bookshelf: asking 338. Send your offer as a number.
 [market_buyer] opening at remembered low 100.0 (shop asked 338)
-[buyer] -> '100.0' taskId=ebe178af
+[buyer] -> '100.0' taskId=212cf46c
 [buyer] <- TASK_STATE_INPUT_REQUIRED | 100 is too low. Counteroffer: 260.
 [buyer] ask 260 budget 230 round 2: harness '150' -> 150
-[buyer] -> '150' taskId=ebe178af
+[buyer] -> '150' taskId=212cf46c
 [buyer] <- TASK_STATE_INPUT_REQUIRED | 150 is too low. Counteroffer: 260.
 [buyer] 260 is over 230 and not moving; leaving
-{"shop": "http://127.0.0.1:60383", "receipt": null, "stars": 3, "review": "No deal after 3 rounds since the shop's price exceeded my $230 budget, so no receipt to match, but that's on the budget, not the shop."}
+{"shop": "http://127.0.0.1:64414", "receipt": null, "stars": 3, "review": "No deal reached after 3 rounds with a budget of 230, as the shop's price exceeded it, so no receipt price to compare."}
