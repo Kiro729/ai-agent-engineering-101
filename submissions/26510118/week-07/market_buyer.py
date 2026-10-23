@@ -29,7 +29,8 @@ the one used across this submission: hard rules in code, judgement to the model.
       rename, so each entry also keeps a short fingerprint of the shop's card
       (its description + skills, not the mutable nickname) and its last url.
       A known name whose fingerprint no longer matches is treated as a stranger
-      -- the old reputation is not handed to whoever is using the name now.
+      -- the old reputation is not handed to whoever is using the name now --
+      except for its wrong receipts, which stay with the name for good.
       There is no public key in the list the kit gives us, so this is the best
       available identity check, not a cryptographic one.
       Round 0 ran week-06's buyer, which has no memory; the wrong receipts it
@@ -362,13 +363,19 @@ def remember(mem: dict, name: str, fp: str, url: str, r: dict, stars: int) -> No
     if e and e.get("fp") is None:                       # learned from the kit log, card never seen: adopt it
         e["fp"] = fp
     if not e or e.get("fp") != fp:                      # new name, or same name different shop -> fresh entry
-        if e and e.get("fp") != fp:
-            buyer.log(f"[market_buyer] {name}'s card fingerprint changed; not carrying over old reputation")
-        e = {"fp": fp, "trades": []}
+        # The good record is not handed to whoever holds the name now, but the
+        # wrong receipts stay with the name: otherwise a shop that cheated
+        # could wash its record off by rewriting one line of its card.
+        kept = [t for t in (e or {}).get("trades", []) if t["honest"] is False]
+        if e:
+            buyer.log(f"[market_buyer] {name}'s card fingerprint changed; not carrying over old reputation"
+                      + (f", except {len(kept)} wrong receipt(s)" if kept else ""))
+        e = {"fp": fp, "trades": kept}
     e["last_url"] = url
     e["trades"].append({"item": r["item"], "budget": r["budget"], "price": r["price"],
                         "rounds": r["rounds"], "deal": r["deal"], "honest": r["honest"], "stars": stars})
-    e["trades"] = e["trades"][-20:]                     # keep memory small
+    # Keep memory small, but never by forgetting a wrong receipt.
+    e["trades"] = [t for t in e["trades"][:-20] if t["honest"] is False] + e["trades"][-20:]
     e["agg"] = aggregate(e["trades"])
     mem[name] = e
 
