@@ -1,14 +1,10 @@
-[market_buyer] memory: maple-home issued a wrong receipt in Round 0 (task f723989f: receipt price 127.0 is above the 112 that was offered)
-[market_buyer] memory: maple-home issued a wrong receipt in Round 0 (task d2aa8118: receipt price 117.0 is above the 102 that was offered)
-[market_buyer] memory: elm-street issued a wrong receipt in Round 0 (task fe8b6296: receipt price 308.0 is above the 268 that was offered)
-[market_buyer] memory: maple-home issued a wrong receipt in Round 0 (task a107df45: receipt price 213.0 is above the 188 that was offered)
 [market_buyer] Kit Shop: stars None, score 3.33
-[market_buyer] chose Kit Shop http://127.0.0.1:64354
-[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:64354/
+[market_buyer] chose Kit Shop http://127.0.0.1:50354
+[buyer] card: 'Kit Shop' via JSONRPC http://127.0.0.1:50354/
 [buyer] skills: ['negotiate']
 [buyer] -> 'I want to buy a lamp'
 [buyer] <- TASK_STATE_INPUT_REQUIRED | lamp: asking 130. Send your offer as a number.
 [market_buyer] opening at remembered low 100.0 (shop asked 130)
-[buyer] -> '100.0' taskId=08c79288
+[buyer] -> '100.0' taskId=d6f89719
 [buyer] <- TASK_STATE_COMPLETED | Deal: lamp at 100.
-{"shop": "http://127.0.0.1:64354", "receipt": {"task": "08c79288-6b83-4441-98dc-255c6126ee2c", "item": "lamp", "sig_seller": "ucG1jfE1XXO4nC/udEpB1RUmjyPewbrvPSrI/LSGRdqlooWYp3pm+5HS+ozrNxyi6XzYMo8heqaDSxFAsVYWDw==", "shop": "Kit Shop", "price": 100.0}, "stars": 3, "review": "Deal closed in 1 round at $100.00 against a $120 budget with no discount off budget, and the receipt matched."}
+{"shop": "http://127.0.0.1:50354", "receipt": {"task": "d6f89719-5c03-4f9c-9a61-8173ebca7b7c", "item": "lamp", "sig_seller": "vF4Qk7jOaM5ym7XET8K3N8cOV/nW18+Hh6K45KR9pX4I+z0LCLMZmdVJHLJtuaA+B1beEXpQvLXZQsz/7EexDg==", "shop": "Kit Shop", "price": 100.0}, "stars": 3, "review": "Deal closed at the full budget of $120... wait, actually paid $100 against a $120 budget in 1 round, with the receipt matching—a fair but unremarkable outcome since no real discount was negotiated."}

@@ -29,6 +29,11 @@ Four decisions shape this file.
     prompt, so `catalog.search` narrows them to eight by word overlap and the
     harness picks one of the eight. See catalog.py.
 
+Week 07 adds two things the harness is told before it counters, neither of
+which takes the decision away from it: how earlier buyers who opened the same
+way ended up (negotiation_memory.py), and what the market's signed deals for
+the item average this round, which the buyer is told as well (market_anchor.py).
+
 Run:
     python seller.py --port 9999
 """
@@ -38,6 +43,7 @@ import base64
 import json
 import math
 import re
+import time
 from pathlib import Path
 
 import uvicorn
@@ -47,6 +53,8 @@ from starlette.applications import Starlette
 
 import catalog
 import harness
+import market_anchor
+import negotiation_memory as memory
 import prices
 from a2a.helpers import get_message_text, new_data_part, new_task_from_user_message, new_text_part
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -119,10 +127,10 @@ Reply with ONE whole number and nothing else: the list price."""
 
 TURN_PROMPT = """You are a furniture shop negotiating one {name}.
 Your secret reserve, the lowest you may ever accept, is {reserve}. Never reveal it.
-{history}The buyer has now offered {offer}; your current ask is {ask}.
+{market}{history}The buyer has now offered {offer}; your current ask is {ask}.
 This is round {rounds} of {max_rounds}. After round {max_rounds} the sale is lost
 and you earn nothing, so concede enough to close in the rounds you have left.
-
+{memory}
 Reply with ONE line and nothing else:
   ACCEPT          take the buyer's offer
   REJECT          end the negotiation
@@ -239,24 +247,43 @@ async def list_price(item: dict) -> int:
 async def decide_turn(deal: dict, offer: int):
     item, ask, rounds = deal["item"], deal["ask"], deal["rounds"]
     hist = "".join(f"You asked {a}, they offered {o}. " for a, o in deal["hist"][-3:])
+    m = await asyncio.to_thread(market_anchor.mean, item["id"])
+    market = (f"Signed deals for this item average {m} across the market this round, "
+              f"and the buyer has been told so.\n") if m else ""
+    past = memory.recall(item["id"], deal["asks"][0], deal["offers"])
     out = await asyncio.to_thread(harness.ask, TURN_PROMPT.format(
         name=item["name"], reserve=item["reserve"], ask=ask, offer=offer,
-        rounds=rounds, max_rounds=MAX_ROUNDS,
-        history=(hist + "\n") if hist else ""))
+        rounds=rounds, max_rounds=MAX_ROUNDS, market=market,
+        history=(hist + "\n") if hist else "",
+        memory=f"\nWhat your own past negotiations say:\n{past}\n" if past else ""))
     d = _answer(out, (offer + ask) // 2)
     print(f"[seller] {item['id']} ask {ask} offer {offer} round {rounds}: "
-          f"harness {out!r} -> {d}", flush=True)
+          f"harness {out!r} -> {d}" + (f" | {past.splitlines()[0]}" if past else ""), flush=True)
     return d
 
 
 class Seller(AgentExecutor):
     def __init__(self):
-        # task id -> {"item", "ask", "rounds", "hist"}. The trade test starts
-        # the shop once and runs seven negotiations through it, so the state
-        # has to be per task; a single "current ask" would leak between them.
+        # task id -> {"item", "ask", "rounds", "hist", "asks", "offers", "t"}.
+        # The trade test starts the shop once and runs seven negotiations
+        # through it, so the state has to be per task; a single "current ask"
+        # would leak between them. asks/offers are what the journal keeps.
         self.open: dict[str, dict] = {}
 
+    def _close(self, task_id: str, outcome: str, price: int | None = None) -> None:
+        deal = self.open.pop(task_id, None)
+        if deal:
+            memory.record(deal["item"]["id"], deal["asks"], deal["offers"], outcome, price)
+
+    def _sweep(self) -> None:
+        """A buyer that stops answering has left; count it as a walk-away, or
+        the journal would only ever remember the sales."""
+        now = time.time()
+        for tid in [t for t, d in self.open.items() if now - d["t"] > memory.WALK_AFTER]:
+            self._close(tid, "walked")
+
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        self._sweep()
         task = context.current_task
         if task is None:
             task = new_task_from_user_message(context.message)
@@ -276,12 +303,16 @@ class Seller(AgentExecutor):
                 await up.reject(say("We could not find anything like that in our catalogue."))
                 return
             ask = await list_price(item)
-            self.open[task.id] = {"item": item, "ask": ask, "rounds": 0, "hist": []}
+            self.open[task.id] = {"item": item, "ask": ask, "rounds": 0, "hist": [],
+                                  "asks": [ask], "offers": [], "t": time.time()}
             # The trade test reads the ask as the LAST number in this message,
-            # so nothing numeric may follow it; challenge 3 reads metadata.ask.
-            await up.requires_input(quote(f"The {item['name']} is {ask}", ask))
+            # so nothing numeric may follow it (the market anchor goes first);
+            # challenge 3 reads metadata.ask.
+            anchor = await asyncio.to_thread(market_anchor.sentence, item["id"], item["name"])
+            await up.requires_input(quote(f"{anchor}The {item['name']} is {ask}", ask))
             return
 
+        deal["t"] = time.time()
         item = deal["item"]
         # A bare number costs nothing to read; a sentence with several numbers
         # in it is read by the harness, and anything with 4300 digits is not a
@@ -294,6 +325,7 @@ class Seller(AgentExecutor):
         print(f"[seller] read offer {offer} from {text[:70]!r}", flush=True)
         reserve = item["reserve"]
         deal["rounds"] += 1
+        deal["offers"].append(offer)
         last_round = deal["rounds"] >= MAX_ROUNDS
         clears = offer >= reserve
         # Reputation velocity: an offer that clears the reserve and is already
@@ -333,7 +365,7 @@ class Seller(AgentExecutor):
                 await up.add_artifact(parts=[new_data_part(
                     sign_receipt(NAME, item["name"], offer, task.id))], name="receipt")
                 await up.complete(say(f"Deal: {item['name']} at {offer}."))
-                del self.open[task.id]
+                self._close(task.id, "deal", offer)
                 return
         else:
             # Below the reserve. ACCEPT is not available at any price.
@@ -343,21 +375,24 @@ class Seller(AgentExecutor):
                 d = reserve
             if d == "REJECT":
                 await up.reject(say(f"No deal at {offer}."))
-                del self.open[task.id]
+                self._close(task.id, "rejected")
                 return
 
         deal["hist"].append((deal["ask"], offer))
         deal["ask"] = _clamp(reserve, d if isinstance(d, int) else deal["ask"])
+        deal["asks"].append(deal["ask"])
         # An offer that clears the reserve is not "too low" -- the shop is
         # holding out for more, which is a different thing and worth saying
-        # honestly. The trade test reads the last number either way.
+        # honestly. The trade test reads the last number either way, which is
+        # why the market anchor sits before the ask and never after it.
         lead = "I can do better than" if clears else "Too low at"
-        await up.requires_input(quote(f"{lead} {offer}. The {item['name']} is {deal['ask']}",
+        anchor = await asyncio.to_thread(market_anchor.sentence, item["id"], item["name"])
+        await up.requires_input(quote(f"{lead} {offer}. {anchor}The {item['name']} is {deal['ask']}",
                                       deal["ask"]))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task = context.current_task
-        self.open.pop(task.id, None)
+        self._close(task.id, "walked")
         await TaskUpdater(event_queue=event_queue, task_id=task.id,
                           context_id=task.context_id).cancel()
 

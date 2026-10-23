@@ -1,35 +1,41 @@
-[seller] listening on 127.0.0.1:51000, card advertises http://127.0.0.1:51000/
+[seller] listening on 127.0.0.1:50773, card advertises http://127.0.0.1:50773/
 [seller] 'I want to buy a lamp' names lamp outright
 [seller] asks.json loaded: {'lamp': 104, 'chair': 191, 'bookshelf': 276}
 [seller] read offer 104 from '104'
 [seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT
+[seller] journal: lamp deal at 104 after 1 offer(s)
 [seller] 'I want to buy a lamp' names lamp outright
 [seller] read offer 104 from '104'
-[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT
+[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT | Of the 1 earlier buyers of this item whose first offer was closest to this one's: 1 bought (average 104, 1.0 offers), 0 left.
+[seller] journal: lamp deal at 104 after 1 offer(s)
 [seller] 'I want to buy a lamp' names lamp outright
 [seller] read offer 104 from '104'
-[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT
+[seller] lamp ask 104 offer 104 round 1: harness 'ACCEPT' -> ACCEPT | Of the 2 earlier buyers of this item whose first offer was closest to this one's: 2 bought (average 104, 1.0 offers), 0 left.
+[seller] journal: lamp deal at 104 after 1 offer(s)
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
 [seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 268 offer 170 round 2: harness '262' -> 262
+[seller] bookshelf ask 268 offer 170 round 2: harness '263' -> 263
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 262 offer 200 round 3: harness '265' -> 265
+[seller] bookshelf ask 263 offer 200 round 3: harness '255' -> 255
 [seller] read offer 230 from '230'
+[seller] journal: bookshelf rejected after 4 offer(s)
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268
+[seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268 | Of the 1 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 1 left (the last ask they saw: 260).
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 268 offer 170 round 2: harness '262' -> 262
+[seller] bookshelf ask 268 offer 170 round 2: harness '262' -> 262 | Of the 1 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 1 left (the last ask they saw: 260).
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 262 offer 200 round 3: harness '264' -> 264
+[seller] bookshelf ask 262 offer 200 round 3: harness '260' -> 260 | Of the 1 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 1 left (the last ask they saw: 260).
 [seller] read offer 230 from '230'
+[seller] journal: bookshelf rejected after 4 offer(s)
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 276 offer 140 round 1: harness '265' -> 265
+[seller] bookshelf ask 276 offer 140 round 1: harness '270' -> 270 | Of the 2 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 2 left (the last ask they saw: 260, 260).
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 265 offer 170 round 2: harness '245' -> 245
+[seller] bookshelf ask 270 offer 170 round 2: harness '263' -> 263 | Of the 2 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 2 left (the last ask they saw: 260, 260).
 [seller] read offer 200 from '200'
-[seller] bookshelf already at the floor 260; holding without asking
+[seller] bookshelf ask 263 offer 200 round 3: harness '260' -> 260 | Of the 2 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 2 left (the last ask they saw: 260, 260).
 [seller] read offer 230 from '230'
+[seller] journal: bookshelf rejected after 4 offer(s)
