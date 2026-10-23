@@ -33,6 +33,20 @@ def evidence() -> None:
         print("\n".join(["", order, shop, deal, line, *verdict]))
 
 
+def without_round0(mem: dict) -> dict:
+    """The memory minus what import_round0 added, so the 'before' table is the
+    same however many times the buyer has run since."""
+    mem = copy.deepcopy(mem)
+    for name in list(mem):
+        e = mem[name]
+        e["trades"] = [t for t in e.get("trades", []) if t.get("src") != "round-0 kit log"]
+        if e["trades"]:
+            e["agg"] = mb.aggregate(e["trades"])
+        else:
+            del mem[name]
+    return mem
+
+
 def table(shops: list, mem: dict, label: str) -> None:
     print(f"\n--- {label}")
     for sh in shops:
@@ -49,7 +63,7 @@ def main() -> int:
     print("# the wrong receipts week-06's buyer caught in Round 0 (from logs/market-kit.log)")
     evidence()
     shops = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
-    mem = mb.load_mem(HERE / ".market" / "memory.json")
+    mem = without_round0(mb.load_mem(HERE / ".market" / "memory.json"))
     print(f"\n# the buyer's filter on the {len(shops)} shops of the last live order "
           f"(only avoided shops and the two cheats are listed)")
     table(shops, mem, "memory as it was: Round 0 never reached it")

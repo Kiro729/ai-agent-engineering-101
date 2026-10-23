@@ -51,7 +51,6 @@ from pathlib import Path
 
 import buyer          # week-06 negotiation, reused
 import harness
-import prices
 
 BAD_STARS = 2.5       # a trust-weighted average below this, with a safer shop around, is avoided
 EXPLORE = 0.4         # nudge for a shop never traded with, so a new shop can win a first customer

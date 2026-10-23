@@ -33,10 +33,18 @@ def mean(item_id: str) -> int | None:
 
 
 def sentence(item_id: str, name: str) -> str:
-    """Said before the ask, never after it: buyers read the last number as the
-    ask, so the anchor must not be the last number in the message."""
+    """What the buyer is told. Said before the ask, never after it: buyers read
+    the last number as the ask, so the anchor must not be the last number."""
     m = mean(item_id)
     if m is None:
         return ""
     return (f"Signed deals for a {name} average {m} across the market this round, "
             f"and every receipt we issue is signed too. ")
+
+
+def for_harness(item_id: str) -> str:
+    """What the harness is told: the same figure, and that the buyer has it."""
+    m = mean(item_id)
+    if m is None:
+        return ""
+    return f"Signed deals for this item average {m} across the market this round, and the buyer has been told so.\n"

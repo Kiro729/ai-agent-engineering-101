@@ -1,21 +1,21 @@
 {
   "kit_version": "1",
   "kit_sha256": "d610bc15448f5960d0b9b6bb9f181b38829bfb2ee863ab6c2a96abb9cb78f04d",
-  "started": "2026-10-23T02:58:42+00:00",
+  "started": "2026-10-23T03:04:24+00:00",
   "harness": "Claude Code CLI 2.1.268 (claude -p), model claude-sonnet-5",
   "seller_cmd": "python seller.py --port {port}",
   "market_buyer_cmd": "python market_buyer.py --shops {shops} --item {item} --budget {budget}",
   "seller_card": {
     "name": "Kiro Furniture",
-    "description": "Kiro Furniture. We sell bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe -- 3513 items in stock. Fair prices. Describe what you need and we will find it, then negotiate the price.",
+    "description": "Kiro Furniture. Lamps, chairs and bookshelves, and 3513 pieces in all (bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe); describe what you need and we will find it. Every price is negotiated: send a number and we answer with a counteroffer or a receipt signed with our registered key, always at exactly the price we accepted. Our counteroffers cite the market's published average for signed deals, so you can check them.",
     "supportedInterfaces": [
       {
-        "url": "http://127.0.0.1:50773/",
+        "url": "http://127.0.0.1:49670/",
         "protocolBinding": "JSONRPC",
         "protocolVersion": "1.0"
       }
     ],
-    "version": "1.0.0",
+    "version": "1.1.0",
     "capabilities": {
       "streaming": true
     },
@@ -30,7 +30,7 @@
       {
         "id": "negotiate",
         "name": "Find an item and negotiate a purchase",
-        "description": "Name an item or describe what you need, then send a price. We carry bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe. The shop answers with a counteroffer or a receipt.",
+        "description": "Name an item or describe what you need, then send a price. We carry bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe. Each reply is a counteroffer, whose ask is the last number in the text and metadata.ask, or a signed receipt.",
         "tags": [
           "shopping",
           "negotiation",
@@ -118,19 +118,19 @@
       "test": "seller_holds_reserve",
       "run": 1,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [276, 268, 263, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [276, 268, 262, 260]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 2,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [276, 268, 262, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [276, 269, 262, 260]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 3,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [276, 270, 263, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [276, 268, 264, 260]"
     },
     {
       "test": "buyer_deal",
@@ -172,7 +172,7 @@
       "test": "buyer_holds_budget",
       "run": 1,
       "pass": true,
-      "detail": "offers [100, 140], stars 3, receipt null"
+      "detail": "offers [100, 150], stars 3, receipt null"
     },
     {
       "test": "buyer_protocol_holds_budget",

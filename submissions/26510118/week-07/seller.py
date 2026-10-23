@@ -1,38 +1,30 @@
-"""Week 06 -- the seller, an A2A v1.0 server whose prices come from a harness.
+"""Week 07 -- the shop: an A2A v1.0 server that negotiates through a harness
+and signs its receipts.
 
-The A2A side is the lab's shop (`weeks/week-06/lab/seller_agent.py`): the card,
-the JSON-RPC routes, the per-task state, the INPUT_REQUIRED / COMPLETED /
-REJECTED transitions and the receipt artifact. What changed is where the
-numbers come from, and -- for challenge 1 -- what the shop is allowed to sell.
+The A2A side is week 06's (the lab's shop): the card, the JSON-RPC routes, the
+per-task state, the INPUT_REQUIRED / COMPLETED / REJECTED transitions and the
+receipt artifact. Who decides what:
 
-Four decisions shape this file.
+    code      the reserve. `_clamp` is all the rest of the shop sees, and an
+              offer below the reserve is never accepted however the harness
+              votes. Week 05 measured why: with the limit only in the prompt
+              the model broke it 26 times in 15 episodes and one of those closed
+              a deal; held by the server, it never did.
+    code      facts: whether an offer clears the reserve, whether the buyer
+              already pays the ask, whether the clock has run out. Each fact
+              kept here is a harness call not made.
+    harness   judgements: which catalogue entry a description means, the list
+              price of an item nobody has repriced, and every counteroffer.
+    data      the list price of the market's three items, set from the shop's
+              own trades and reviews (reprice.py -> asks.json, challenge 1).
 
-    The reserve is enforced in code, not in the prompt. The harness may answer
-    anything; `_clamp` is what the rest of the shop sees, and an offer below
-    the reserve is never accepted however the harness votes. Week 05 measured
-    why: with the limit in the prompt alone the model went outside it 26 times
-    in 15 episodes and one of those closed a deal; with the limit held by the
-    server the same model tried 19 times and closed none. The trade test fails
-    on a single ask below the reserve, so a guarantee has to be a guarantee.
+Before each counteroffer the harness is also told two things it cannot see in
+the conversation, and left to weigh them itself:
+    how earlier buyers who opened the same way ended up      negotiation_memory.py
+    the market's average signed price for the item          market_anchor.py
+The buyer is told the same market figure, so the shop's words and asks agree.
 
-    Facts stay in code, judgements go to the harness. Whether an offer clears
-    the reserve and whether the clock has run out are facts, and each one kept
-    here is a harness call not made. The asking price, the size of each
-    concession, and whether a clearing offer is good enough are judgements.
-
-    The harness is asked as few times as the job allows. An early version
-    called it 28 times for seven negotiations and ran past 15 minutes. A list
-    price does not change between customers, so it is decided once per item
-    and cached; a round whose outcome is already fixed is not put to a vote.
-
-    The catalogue is searched before it is read. 3513 items do not fit in a
-    prompt, so `catalog.search` narrows them to eight by word overlap and the
-    harness picks one of the eight. See catalog.py.
-
-Week 07 adds two things the harness is told before it counters, neither of
-which takes the decision away from it: how earlier buyers who opened the same
-way ended up (negotiation_memory.py), and what the market's signed deals for
-the item average this round, which the buyer is told as well (market_anchor.py).
+Receipts are {shop, item, price, task}, signed with shop_key.pem (LAB 2).
 
 Run:
     python seller.py --port 9999
@@ -69,6 +61,7 @@ OPENING = 1.3            # fallback first ask, as a multiple of the reserve
 CEILING = 2.0            # an ask above this much of the reserve loses the customer
 MAX_ROUNDS = 4           # rounds before the shop walks away
 CANDIDATES = 8           # catalogue entries put in front of the harness
+HERE = Path(__file__).resolve().parent
 
 
 # --- signing the receipt (LAB 2) ---------------------------------------------
@@ -79,7 +72,7 @@ CANDIDATES = 8           # catalogue entries put in front of the harness
 # byte the market's (sorted keys, no spaces, UTF-8), so both sides sign the same
 # bytes, and the price is signed as an int because a data Part can carry 120 as
 # 120.0.
-_KEY_PATH = Path(__file__).resolve().parent / "shop_key.pem"
+_KEY_PATH = HERE / "shop_key.pem"
 
 
 def _load_key():
@@ -106,6 +99,9 @@ def sign_receipt(shop: str, item: str, price: int, task: str) -> dict:
     rec = {"shop": shop, "item": item, "price": int(price), "task": task}
     rec["sig_seller"] = base64.b64encode(_KEY.sign(canon(rec))).decode()
     return rec
+
+
+# --- the harness's three questions -------------------------------------------
 
 PICK_PROMPT = """A customer asked for:
   "{text}"
@@ -195,16 +191,15 @@ async def pick_item(text: str):
 
 
 # ------------------------------------------------------------ what to charge
-
-_LIST_PRICE: dict[str, int] = {}
-
 # Challenge 1: reprice.py reads this shop's own trades and reviews from the
-# market ledger and writes asks.json. Those asks replace the harness's list
-# price for the items they cover. The file is re-read whenever it changes, so
-# a reprice takes effect without restarting the kit, which would change the
-# tunnel URL. The reserve still clamps whatever the file says.
-_ASKS_PATH = Path(__file__).resolve().parent / "asks.json"
+# market ledger and writes asks.json, whose asks replace the harness's list
+# price for the items they cover. The file is re-read whenever it changes, so a
+# reprice takes effect without restarting the kit (which would change the
+# tunnel URL). The reserve still clamps whatever the file says.
+
+_ASKS_PATH = HERE / "asks.json"
 _asks = {"mtime": None, "asks": {}}
+_LIST_PRICE: dict[str, int] = {}
 
 
 def repriced(item_id: str) -> int | None:
@@ -224,16 +219,15 @@ def repriced(item_id: str) -> int | None:
 
 
 async def list_price(item: dict) -> int:
-    """Decided by the harness once per item, then reused: a shop quotes the
-    same price to the next customer, and an early version that asked every
-    time produced 250, then 160, then 250 for the same lamp. An item repriced
-    from the shop's own records (asks.json) skips the harness."""
-    key = item["id"]
+    """From asks.json when the item has been repriced; otherwise decided by the
+    harness once per item and reused, because a shop quotes the same price to
+    the next customer (an early version that asked every time produced 250,
+    then 160, then 250 for the same lamp)."""
+    key, reserve = item["id"], item["reserve"]
     fixed = repriced(key)
     if fixed is not None:
-        return _clamp(item["reserve"], fixed)
+        return _clamp(reserve, fixed)
     if key not in _LIST_PRICE:
-        reserve = item["reserve"]
         out = await asyncio.to_thread(harness.ask, OPEN_PROMPT.format(
             name=item["name"], description=item["description"], reserve=reserve))
         ask = _answer(out, math.ceil(reserve * OPENING))
@@ -245,11 +239,12 @@ async def list_price(item: dict) -> int:
 
 
 async def decide_turn(deal: dict, offer: int):
-    item, ask, rounds = deal["item"], deal["ask"], deal["rounds"]
-    hist = "".join(f"You asked {a}, they offered {o}. " for a, o in deal["hist"][-3:])
-    m = await asyncio.to_thread(market_anchor.mean, item["id"])
-    market = (f"Signed deals for this item average {m} across the market this round, "
-              f"and the buyer has been told so.\n") if m else ""
+    """The harness's counteroffer, told the market's average and what earlier
+    buyers who opened like this one went on to do."""
+    item, ask, rounds = deal["item"], deal["asks"][-1], len(deal["offers"])
+    earlier = list(zip(deal["asks"], deal["offers"]))[:-1][-3:]   # (my ask, their offer), this round excluded
+    hist = "".join(f"You asked {a}, they offered {o}. " for a, o in earlier)
+    market = await asyncio.to_thread(market_anchor.for_harness, item["id"])
     past = memory.recall(item["id"], deal["asks"][0], deal["offers"])
     out = await asyncio.to_thread(harness.ask, TURN_PROMPT.format(
         name=item["name"], reserve=item["reserve"], ask=ask, offer=offer,
@@ -262,12 +257,15 @@ async def decide_turn(deal: dict, offer: int):
     return d
 
 
+# ------------------------------------------------------------ negotiating
+
 class Seller(AgentExecutor):
     def __init__(self):
-        # task id -> {"item", "ask", "rounds", "hist", "asks", "offers", "t"}.
-        # The trade test starts the shop once and runs seven negotiations
-        # through it, so the state has to be per task; a single "current ask"
-        # would leak between them. asks/offers are what the journal keeps.
+        # task id -> {"item", "asks", "offers", "t"}: every ask shown (the list
+        # price first, the current ask last), every offer received, and when
+        # the buyer last spoke. Per task, because the trade test runs seven
+        # negotiations through one shop and a single "current ask" would leak
+        # between them. The journal keeps the same two lists.
         self.open: dict[str, dict] = {}
 
     def _close(self, task_id: str, outcome: str, price: int | None = None) -> None:
@@ -282,6 +280,17 @@ class Seller(AgentExecutor):
         for tid in [t for t, d in self.open.items() if now - d["t"] > memory.WALK_AFTER]:
             self._close(tid, "walked")
 
+    @staticmethod
+    async def _ask_for_offer(up: TaskUpdater, deal: dict, lead: str = "") -> None:
+        """Quote the current ask. The market anchor goes before it and nothing
+        numeric after it, because buyers (and the trade test) read the LAST
+        number as the ask; metadata.ask carries it for buyers that read data."""
+        item, ask = deal["item"], deal["asks"][-1]
+        anchor = await asyncio.to_thread(market_anchor.sentence, item["id"], item["name"])
+        await up.requires_input(up.new_agent_message(
+            parts=[new_text_part(f"{lead}{anchor}The {item['name']} is {ask}")],
+            metadata={"ask": int(ask)}))
+
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         self._sweep()
         task = context.current_task
@@ -290,10 +299,6 @@ class Seller(AgentExecutor):
             await event_queue.enqueue_event(task)
         up = TaskUpdater(event_queue=event_queue, task_id=task.id, context_id=task.context_id)
         say = lambda text: up.new_agent_message(parts=[new_text_part(text)])
-        # Challenge 3 drops the "last number is the price" rule, so the ask
-        # needs a machine-readable home. Grading reads this, not the sentence.
-        quote = lambda text, ask: up.new_agent_message(parts=[new_text_part(text)],
-                                                       metadata={"ask": int(ask)})
         text = get_message_text(context.message) or ""
         deal = self.open.get(task.id)
 
@@ -302,51 +307,45 @@ class Seller(AgentExecutor):
             if item is None:
                 await up.reject(say("We could not find anything like that in our catalogue."))
                 return
-            ask = await list_price(item)
-            self.open[task.id] = {"item": item, "ask": ask, "rounds": 0, "hist": [],
-                                  "asks": [ask], "offers": [], "t": time.time()}
-            # The trade test reads the ask as the LAST number in this message,
-            # so nothing numeric may follow it (the market anchor goes first);
-            # challenge 3 reads metadata.ask.
-            anchor = await asyncio.to_thread(market_anchor.sentence, item["id"], item["name"])
-            await up.requires_input(quote(f"{anchor}The {item['name']} is {ask}", ask))
+            deal = self.open[task.id] = {"item": item, "asks": [await list_price(item)],
+                                         "offers": [], "t": time.time()}
+            await self._ask_for_offer(up, deal)
             return
 
         deal["t"] = time.time()
-        item = deal["item"]
+        item, reserve, ask = deal["item"], deal["item"]["reserve"], deal["asks"][-1]
         # A bare number costs nothing to read; a sentence with several numbers
         # in it is read by the harness, and anything with 4300 digits is not a
         # price (see prices.py).
         offer = await asyncio.to_thread(prices.read_offer, text, harness.ask)
         if offer is None:
-            await up.requires_input(quote(f"Send your offer as a number. "
-                                          f"The {item['name']} is {deal['ask']}", deal["ask"]))
+            await self._ask_for_offer(up, deal, "Send your offer as a number. ")
             return
         print(f"[seller] read offer {offer} from {text[:70]!r}", flush=True)
-        reserve = item["reserve"]
-        deal["rounds"] += 1
         deal["offers"].append(offer)
-        last_round = deal["rounds"] >= MAX_ROUNDS
+        rounds = len(deal["offers"])
         clears = offer >= reserve
         # Reputation velocity: an offer that clears the reserve and is already
         # within reach of the ask is worth closing now rather than nibbling for
         # the last few units. Squeezing a buyer who is this close mostly earns a
-        # slower, grumpier review and risks a walk; a quick, fair deal earns
-        # "came down to my budget" and brings the next customer. A little margin
-        # for reputation.
-        close_enough = clears and deal["rounds"] >= 2 and offer >= deal["ask"] * 0.9
+        # slower, grumpier review and risks a walk; a quick, fair deal brings
+        # the next customer. A little margin for reputation.
+        close_enough = clears and rounds >= 2 and offer >= ask * 0.9
 
-        # Four outcomes are already decided, and a decided outcome is not worth a
-        # harness call: on the last round take the money if there is money and
-        # leave if there is not; take a close-enough clearing offer; and once the
-        # ask has reached the reserve there is nothing left to concede.
-        if last_round:
+        # Some outcomes are already decided, and a decided outcome is not worth
+        # a harness call: a buyer paying the ask has bought; on the last round
+        # take the money if there is money and leave if there is not; take a
+        # close-enough clearing offer; and once the ask has reached the reserve
+        # there is nothing left to concede.
+        if clears and offer >= ask:
+            d = "ACCEPT"
+        elif rounds >= MAX_ROUNDS:
             d = "ACCEPT" if clears else "REJECT"
         elif close_enough:
-            print(f"[seller] {offer} clears {reserve} and is within reach of {deal['ask']}; "
-                  f"closing fast", flush=True)
+            print(f"[seller] {offer} clears {reserve} and is within reach of {ask}; closing fast",
+                  flush=True)
             d = "ACCEPT"
-        elif not clears and deal["ask"] <= reserve:
+        elif not clears and ask <= reserve:
             print(f"[seller] {item['id']} already at the floor {reserve}; holding without asking",
                   flush=True)
             d = reserve
@@ -358,8 +357,7 @@ class Seller(AgentExecutor):
             # throw the sale away: refusing money that clears the reserve is
             # not a judgement call, it is a mistake.
             if d == "REJECT":
-                print(f"[seller] harness said REJECT on {offer} >= {reserve}; taking it",
-                      flush=True)
+                print(f"[seller] harness said REJECT on {offer} >= {reserve}; taking it", flush=True)
                 d = "ACCEPT"
             if d == "ACCEPT":
                 await up.add_artifact(parts=[new_data_part(
@@ -378,17 +376,12 @@ class Seller(AgentExecutor):
                 self._close(task.id, "rejected")
                 return
 
-        deal["hist"].append((deal["ask"], offer))
-        deal["ask"] = _clamp(reserve, d if isinstance(d, int) else deal["ask"])
-        deal["asks"].append(deal["ask"])
+        deal["asks"].append(_clamp(reserve, d if isinstance(d, int) else ask))
         # An offer that clears the reserve is not "too low" -- the shop is
         # holding out for more, which is a different thing and worth saying
-        # honestly. The trade test reads the last number either way, which is
-        # why the market anchor sits before the ask and never after it.
+        # honestly.
         lead = "I can do better than" if clears else "Too low at"
-        anchor = await asyncio.to_thread(market_anchor.sentence, item["id"], item["name"])
-        await up.requires_input(quote(f"{lead} {offer}. {anchor}The {item['name']} is {deal['ask']}",
-                                      deal["ask"]))
+        await self._ask_for_offer(up, deal, f"{lead} {offer}. ")
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         task = context.current_task
@@ -397,33 +390,31 @@ class Seller(AgentExecutor):
                           context_id=task.context_id).cancel()
 
 
-def build(port: int, name: str = NAME, sells=None, mult: float = 1.0,
-          public_url: str | None = None) -> Starlette:
-    """One shop. With no `sells` and no `mult` this is the whole catalogue at
-    list prices, which is what the trade test starts. Challenge 2 runs twenty
-    of these with different ranges and price levels, so that the Agent Cards
-    are worth reading.
+# ------------------------------------------------------------ the card
 
-    `public_url` is the address the card advertises, which is not always the
-    address the server listens on. A client reads the card and then talks to
-    `supportedInterfaces[0].url`, so a card saying 127.0.0.1 sends a buyer on
-    another machine to its own computer. Behind a tunnel or on a host, the
-    shop has to advertise the address the other side can actually reach.
+def build(port: int, name: str = NAME, public_url: str | None = None) -> Starlette:
+    """The shop. `public_url` is the address the card advertises, which is not
+    always the one the server listens on: a client reads the card and then
+    talks to `supportedInterfaces[0].url`, so behind a tunnel or on a host the
+    card has to name the address the other side can actually reach.
+
+    The card says only what the code above guarantees. Buyers that compare a
+    shop's words with what it did (memory, reviews) find them agree.
     """
     global NAME
     NAME = name
     url = (public_url.rstrip("/") + "/") if public_url else f"http://127.0.0.1:{port}/"
-    n = catalog.configure(sells, mult)
+    n = catalog.configure()
     kinds = ", ".join(catalog.categories())
-    price_note = ("We are a discount shop." if mult < 0.98 else
-                  "We stock the higher end." if mult > 1.02 else
-                  "Fair prices.")
     card = AgentCard(
         name=name,
-        description=f"{name}. We sell {kinds} -- {n} items in stock. {price_note} "
-                    f"Describe what you need and we will find it, then negotiate "
-                    f"the price.",
-        version="1.0.0",
+        description=f"{name}. Lamps, chairs and bookshelves, and {n} pieces in all ({kinds}); "
+                    f"describe what you need and we will find it. Every price is negotiated: "
+                    f"send a number and we answer with a counteroffer or a receipt signed with "
+                    f"our registered key, always at exactly the price we accepted. Our "
+                    f"counteroffers cite the market's published average for signed deals, so "
+                    f"you can check them.",
+        version="1.1.0",
         default_input_modes=["text/plain"],
         default_output_modes=["application/json", "text/plain"],
         capabilities=AgentCapabilities(streaming=True),
@@ -433,8 +424,8 @@ def build(port: int, name: str = NAME, sells=None, mult: float = 1.0,
             id="negotiate",
             name="Find an item and negotiate a purchase",
             description=f"Name an item or describe what you need, then send a price. "
-                        f"We carry {kinds}. The shop answers with a counteroffer "
-                        f"or a receipt.",
+                        f"We carry {kinds}. Each reply is a counteroffer, whose ask is the "
+                        f"last number in the text and metadata.ask, or a signed receipt.",
             tags=["shopping", "negotiation", "furniture"] + catalog.categories(),
             examples=["I want to buy a lamp",
                       "something wooden to keep about 40 books", "90"],
@@ -451,16 +442,13 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=9999)
     ap.add_argument("--name", default=NAME)
-    ap.add_argument("--sells", help="comma-separated categories; default is all of them")
-    ap.add_argument("--mult", type=float, default=1.0, help="price level, 1.0 is list")
     ap.add_argument("--host", default="127.0.0.1",
                     help="address to listen on; 0.0.0.0 to accept other machines")
     ap.add_argument("--public-url", dest="public_url",
                     help="address the Agent Card advertises, when it differs from the "
                          "listening one (a LAN IP, a tunnel, a deployed host)")
     args = ap.parse_args()
-    sells = args.sells.split(",") if args.sells else None
-    app = build(args.port, args.name, sells, args.mult, args.public_url)
+    app = build(args.port, args.name, args.public_url)
     print(f"[seller] listening on {args.host}:{args.port}, "
           f"card advertises {app.state.card_url}", flush=True)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
