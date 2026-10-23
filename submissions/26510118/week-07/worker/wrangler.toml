@@ -9,7 +9,7 @@ compatibility_flags = ["python_workers"]
 
 [vars]
 CF_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"   # used when there is no OpenAI key, or it fails
-OPENAI_MODEL = ""                                  # set to an OpenAI model name to use the API
+OPENAI_MODEL = "gpt-4o-mini"                                  # set to an OpenAI model name to use the API
 OPENAI_EXTRA = "{}"                                # extra JSON fields for the OpenAI request
 MARKET_URL = "https://market.ourolabs.ai"
 MARKET_NAME = "Kiro729"                            # the kit's --name: shop and buyer join under it
