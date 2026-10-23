@@ -56,6 +56,7 @@ BAD_STARS = 2.5       # a trust-weighted average below this, with a safer shop a
 EXPLORE = 0.4         # nudge for a shop never traded with, so a new shop can win a first customer
 CROWD = 0.06          # mild penalty per review: among good shops, lean to the less-crowded (hungrier) one
 SHORTLIST = 3         # how many survivors the harness chooses among
+RECENT = 5            # a shop that broke off 2 of my last 5 trades with it (hung, crashed) is avoided
 
 
 # --------------------------------------------------------------- the memory
@@ -153,9 +154,11 @@ def why_bad(ws: float | None, past: dict | None) -> str | None:
     """Why a shop is to be avoided when a safer one exists, or None. My own
     memory is checked first: a wrong receipt I saw myself outweighs any number
     of good reviews from buyers I cannot check."""
-    cheated = (past or {}).get("agg", {}).get("cheated", 0)
-    if cheated:
-        return f"my memory: {cheated} wrong receipt(s)"
+    agg = (past or {}).get("agg", {})
+    if agg.get("cheated"):
+        return f"my memory: {agg['cheated']} wrong receipt(s)"
+    if agg.get("recent_failed", 0) >= 2:
+        return f"my memory: {agg['recent_failed']} of my last {RECENT} trades there broke off"
     if ws is not None and ws < BAD_STARS:
         return f"reviews: {ws:.1f} stars"
     return None
@@ -237,55 +240,63 @@ def receipt_data(t):
     return None
 
 
-def anchor_from(past: dict | None, budget: int):
-    """The lowest price this shop ever gave me, capped at the budget -- what to
-    open near. None when I have no deal with it to remember."""
+def anchor_from(past: dict | None, item: str, budget: int):
+    """The lowest price this shop ever gave me for this item, capped at the
+    budget -- what to open near. None when I have no such deal to remember.
+    (Per item: a lamp's price is no anchor for a bookshelf. Live, the buyer
+    once opened a bookshelf at a remembered lamp price of 100.)"""
     if not past:
         return None
-    lows = [t["price"] for t in past.get("trades", []) if t.get("deal") and t.get("price")]
-    return min(min(lows), budget) if lows else None
+    lows = [t["price"] for t in past.get("trades", [])
+            if t.get("deal") and t.get("price") and t.get("item") == item]
+    return int(min(min(lows), budget)) if lows else None
 
 
 def trade(url: str, item: str, budget: int, past: dict | None = None) -> dict:
     """Walk into one shop and run week-06's negotiation. Returns the facts the
-    memory and the review need."""
-    c = buyer.Client(url)
-    fp = fingerprint(c.card)
-    anchor = anchor_from(past, budget)          # memory anchoring: open near a remembered low
-    t = c.send(f"I want to buy a {item}")
-    if t is None or buyer.state(t) != "TASK_STATE_INPUT_REQUIRED":
-        buyer.log(f"[market_buyer] {url} did not open a negotiation")
-        return {"deal": False, "receipt": None, "price": None, "rounds": 0, "honest": None, "fp": fp}
-
-    task_id, hist, prev_ask, last_offer, done = t["id"], [], None, None, 0
-    for rounds in range(1, buyer.MAX_ROUNDS + 1):
-        done = rounds
-        ask = buyer.last_number(t)
-        stalled = (ask is not None and prev_ask is not None and ask > budget and ask >= prev_ask)
-        if rounds == 1 and anchor is not None and ask is not None and ask > anchor:
-            what, price = "offer", anchor       # start from what memory says it will take
-            buyer.log(f"[market_buyer] opening at remembered low {anchor} (shop asked {ask})")
-        else:
-            what, price = buyer.choose(item, budget, ask, rounds, hist, stalled)
-        if what == "walk" or price > budget:            # the budget guarantee is in week-06's code
-            break
-        hist.append((ask, price))
-        prev_ask, last_offer = ask, price
-        t = c.send(str(price), task_id)
+    memory and the review need -- also when the shop hangs or breaks off, which
+    must cost the order its deal, never its result line."""
+    r = {"deal": False, "receipt": None, "price": None, "rounds": 0, "honest": None, "fp": None, "error": None}
+    try:
+        c = buyer.Client(url)
+        r["fp"] = fingerprint(c.card)
+        anchor = anchor_from(past, item, budget)    # memory anchoring: open near a remembered low
+        t = c.send(f"I want to buy a {item}")
         if t is None or buyer.state(t) != "TASK_STATE_INPUT_REQUIRED":
-            break
+            buyer.log(f"[market_buyer] {url} did not open a negotiation")
+            return r
 
-    deal = buyer.state(t) == "TASK_STATE_COMPLETED"
-    receipt, price, honest = None, None, None
-    if deal:
-        receipt = receipt_data(t)
-        price, problem = buyer.settled(t, last_offer if last_offer is not None else budget, item)
-        honest = problem is None
-        if not honest:
-            buyer.log(f"[market_buyer] receipt problem: {problem}")
-    elif buyer.state(t) == "TASK_STATE_INPUT_REQUIRED":
-        c.cancel(task_id)
-    return {"deal": deal, "receipt": receipt, "price": price, "rounds": done, "honest": honest, "fp": fp}
+        task_id, hist, prev_ask, last_offer = t["id"], [], None, None
+        for rounds in range(1, buyer.MAX_ROUNDS + 1):
+            r["rounds"] = rounds
+            ask = buyer.last_number(t)
+            stalled = (ask is not None and prev_ask is not None and ask > budget and ask >= prev_ask)
+            if rounds == 1 and anchor is not None and ask is not None and ask > anchor:
+                what, price = "offer", anchor   # start from what memory says it will take
+                buyer.log(f"[market_buyer] opening at remembered low {anchor} (shop asked {ask})")
+            else:
+                what, price = buyer.choose(item, budget, ask, rounds, hist, stalled)
+            if what == "walk" or price > budget:        # the budget guarantee is in week-06's code
+                break
+            hist.append((ask, price))
+            prev_ask, last_offer = ask, price
+            t = c.send(str(price), task_id)
+            if t is None or buyer.state(t) != "TASK_STATE_INPUT_REQUIRED":
+                break
+
+        if buyer.state(t) == "TASK_STATE_COMPLETED":
+            r["deal"], r["receipt"] = True, receipt_data(t)
+            r["price"], problem = buyer.settled(t, last_offer if last_offer is not None else budget, item)
+            r["honest"] = problem is None
+            if problem:
+                buyer.log(f"[market_buyer] receipt problem: {problem}")
+        elif buyer.state(t) == "TASK_STATE_INPUT_REQUIRED":
+            c.cancel(task_id)
+    except Exception as e:                              # noqa: BLE001  (a hung or broken shop)
+        r["deal"], r["receipt"], r["error"] = False, None, type(e).__name__
+        buyer.log(f"[market_buyer] trade with {url} broke off after {r['rounds']} round(s): "
+                  f"{type(e).__name__}")
+    return r
 
 
 # --------------------------------------------------------------- the review
@@ -314,6 +325,9 @@ def derive_stars(r: dict) -> int:
 
 
 def make_review(r: dict) -> tuple[int, str]:
+    if r.get("error"):                                  # the shop stopped answering: its fault, and nothing to word
+        return 2, (f"No deal on the {r['item']} (budget {r['budget']}): the shop stopped answering "
+                   f"after {r['rounds']} round(s).")
     facts = {"deal": r["deal"], "price": r["price"], "budget": r["budget"],
              "rounds": r["rounds"], "receipt_matched": r["honest"]}
     out = harness.ask(REVIEW_PROMPT.format(item=r["item"], budget=r["budget"], facts=json.dumps(facts)))
@@ -354,11 +368,14 @@ def aggregate(trades: list) -> dict:
         "nodeal": sum(1 for t in trades if not t["deal"]),
         "avg_price_ratio": round(sum(t["price"] / max(1, t["budget"]) for t in priced) / len(priced), 3) if priced else 1.0,
         "cheated": sum(1 for t in trades if t["honest"] is False),
+        "recent_failed": sum(1 for t in trades[-RECENT:] if t.get("error")),
     }
 
 
-def remember(mem: dict, name: str, fp: str, url: str, r: dict, stars: int) -> None:
+def remember(mem: dict, name: str, fp: str | None, url: str, r: dict, stars: int) -> None:
     e = mem.get(name)
+    if fp is None and e:                                # the card was never read (the shop failed first): same shop
+        fp = e.get("fp")
     if e and e.get("fp") is None:                       # learned from the kit log, card never seen: adopt it
         e["fp"] = fp
     if not e or e.get("fp") != fp:                      # new name, or same name different shop -> fresh entry
@@ -372,7 +389,8 @@ def remember(mem: dict, name: str, fp: str, url: str, r: dict, stars: int) -> No
         e = {"fp": fp, "trades": kept}
     e["last_url"] = url
     e["trades"].append({"item": r["item"], "budget": r["budget"], "price": r["price"],
-                        "rounds": r["rounds"], "deal": r["deal"], "honest": r["honest"], "stars": stars})
+                        "rounds": r["rounds"], "deal": r["deal"], "honest": r["honest"], "stars": stars,
+                        "error": r.get("error")})
     # Keep memory small, but never by forgetting a wrong receipt.
     e["trades"] = [t for t in e["trades"][:-20] if t["honest"] is False] + e["trades"][-20:]
     e["agg"] = aggregate(e["trades"])
