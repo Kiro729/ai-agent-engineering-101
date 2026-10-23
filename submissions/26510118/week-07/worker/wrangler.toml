@@ -1,0 +1,26 @@
+# The shop on Cloudflare Workers. Build first, then deploy from this folder:
+#   python build.py && uv run pywrangler deploy
+# Secrets (put by hand, never in this file): SHOP_KEY (shop_key.pem), OPENAI_API_KEY (optional).
+name = "kiro-shop"
+main = "src/entry.py"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["python_workers"]
+
+[vars]
+CF_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"   # used when there is no OpenAI key, or it fails
+OPENAI_MODEL = ""                                  # set to an OpenAI model name to use the API
+OPENAI_EXTRA = "{}"                                # extra JSON fields for the OpenAI request
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "SHOP"
+class_name = "Shop"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Shop"]
+
+[observability]
+enabled = true
