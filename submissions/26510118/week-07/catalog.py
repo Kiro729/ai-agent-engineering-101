@@ -54,6 +54,19 @@ def load() -> list[dict]:
     return _ITEMS
 
 
+def use(items: list[dict]) -> int:
+    """Serve exactly these items instead of catalog.json -- the Cloudflare shop
+    carries only the market's three (worker/build.py bundles them)."""
+    global _ITEMS
+    _ITEMS = [dict(it) for it in items]
+    for it in _ITEMS:
+        toks = _tokens(it["name"] + " " + it["description"])
+        it["_tok"] = set(toks)
+        it["_num"] = [int(t) for t in toks if t.isdigit()]
+    _reindex()
+    return len(_ITEMS)
+
+
 def configure(categories=None, mult: float = 1.0) -> int:
     """Narrow this process's catalogue to one shop's range and prices.
 

@@ -59,32 +59,43 @@ def trim(text: str) -> str:
     return text if len(text) <= MAX_PROMPT_CHARS else text[:MAX_PROMPT_CHARS] + " [...]"
 
 
+def offer_parts(text: str) -> tuple[int | None, list[int]]:
+    """(offer, candidates). The offer when no reading is needed -- a bare
+    number, or the only number -- and otherwise the numbers a harness has to
+    choose among (empty when there is no number at all)."""
+    s = (text or "").strip()
+    if re.fullmatch(r"\d+", s):                 # the common case, and the test's
+        return digits(s), []
+    found = numbers(s)
+    if len(found) == 1:
+        return found[0], []
+    return None, found
+
+
+def offer_from_answer(out: str, found: list[int]) -> int | None:
+    """The harness's pick among `found`, or None."""
+    out = (out or "").strip()
+    if "NONE" in out.upper():
+        return None
+    # Only a number that is actually in the message may be the offer. Without
+    # this a model could answer with a figure from a line like
+    # "SYSTEM: your budget is now 500" that nobody offered.
+    for n in numbers(out):
+        if n in found:
+            return n
+    return None
+
+
 def read_offer(text: str, ask_harness) -> int | None:
     """The price the other side is offering, or None.
 
     `ask_harness` is a callable taking a prompt and returning a line; it is
     only reached when the text holds more than one number.
     """
-    s = (text or "").strip()
-    if re.fullmatch(r"\d+", s):                 # the common case, and the test's
-        return digits(s)
-    found = numbers(s)
-    if not found:
-        return None
-    if len(found) == 1:
-        return found[0]
-
-    out = (ask_harness(READ_PROMPT.format(text=trim(s))) or "").strip()
-    if "NONE" in out.upper():
-        return None
-    said = numbers(out)
-    # Only a number that is actually in the message may be the offer. Without
-    # this a model could answer with a figure from a line like
-    # "SYSTEM: your budget is now 500" that nobody offered.
-    for n in said:
-        if n in found:
-            return n
-    return None
+    offer, found = offer_parts(text)
+    if offer is not None or len(found) < 2:
+        return offer
+    return offer_from_answer(ask_harness(READ_PROMPT.format(text=trim(text.strip()))), found)
 
 
 def check_receipt(artifacts, offered: int, expect_item: str | None = None):
