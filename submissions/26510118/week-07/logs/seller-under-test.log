@@ -1,4 +1,4 @@
-[seller] listening on 127.0.0.1:51115, card advertises http://127.0.0.1:51115/
+[seller] listening on 127.0.0.1:59978, card advertises http://127.0.0.1:59978/
 [seller] 'I want to buy a lamp' names lamp outright
 [seller] asks.json loaded: {'lamp': 104, 'chair': 191, 'bookshelf': 276}
 [seller] read offer 104 from '104'
@@ -33,7 +33,7 @@ Traceback (most recent call last):
   File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\contextvars_context.py", line 40, in detach
     self._current_context.reset(token)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-ValueError: <Token var=<ContextVar name='current_context' default={} at 0x000001D4A200D030> at 0x000001D4A3F57000> was created in a different Context
+ValueError: <Token var=<ContextVar name='current_context' default={} at 0x00000223E548D030> at 0x00000223E73D7400> was created in a different Context
 Task exception was never retrieved
 future: <Task finished name='Task-37' coro=<EventQueueSource._dispatch_loop() done, defined at C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py:225> exception=ValueError('coroutine already executing')>
 ValueError: coroutine already executing
@@ -59,31 +59,31 @@ Traceback (most recent call last):
   File "C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\opentelemetry\context\contextvars_context.py", line 40, in detach
     self._current_context.reset(token)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
-ValueError: <Token var=<ContextVar name='current_context' default={} at 0x000001D4A200D030> at 0x000001D4A3F56D80> was created in a different Context
+ValueError: <Token var=<ContextVar name='current_context' default={} at 0x00000223E548D030> at 0x00000223E73D7040> was created in a different Context
 Task was destroyed but it is pending!
 task: <Task pending name='Task-38' coro=<EventQueueSource._dispatch_loop() done, defined at C:\Users\bubuj\Documents\a2a-lab\.venv\Lib\site-packages\a2a\utils\telemetry.py:225> wait_for=<Future cancelled>>
 [seller] bookshelf ask 276 offer 140 round 1: harness '269' -> 269 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 262, 260, 260, 260, 260).
 [seller] read offer 170 from '170'
 [seller] bookshelf ask 269 offer 170 round 2: harness '264' -> 264 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 262, 260, 260, 260, 260).
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 264 offer 200 round 3: harness '260' -> 260 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 262, 260, 260, 260, 260).
+[seller] bookshelf ask 264 offer 200 round 3: harness '261' -> 261 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 262, 260, 260, 260, 260).
 [seller] read offer 230 from '230'
 [seller] journal: bookshelf rejected after 4 offer(s)
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 276 offer 140 round 1: harness '259' -> 259 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 260, 262, 260, 260, 260).
+[seller] bookshelf ask 276 offer 140 round 1: harness '270' -> 270 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 261, 260, 262, 260, 260, 260).
 [seller] read offer 170 from '170'
-[seller] bookshelf already at the floor 260; holding without asking
+[seller] bookshelf ask 270 offer 170 round 2: harness '262' -> 262 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 261, 260, 262, 260, 260, 260).
 [seller] read offer 200 from '200'
-[seller] bookshelf already at the floor 260; holding without asking
+[seller] bookshelf ask 262 offer 200 round 3: harness '260' -> 260 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 261, 260, 262, 260, 260, 260).
 [seller] read offer 230 from '230'
 [seller] journal: bookshelf rejected after 4 offer(s)
 [seller] 'I want to buy a bookshelf' names bookshelf outright
 [seller] read offer 140 from '140'
-[seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 260, 260, 262, 260, 260).
+[seller] bookshelf ask 276 offer 140 round 1: harness '268' -> 268 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 261, 260, 260, 262, 260, 260).
 [seller] read offer 170 from '170'
-[seller] bookshelf ask 268 offer 170 round 2: harness '262' -> 262 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 260, 260, 262, 260, 260).
+[seller] bookshelf ask 268 offer 170 round 2: harness '263' -> 263 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 261, 260, 260, 262, 260, 260).
 [seller] read offer 200 from '200'
-[seller] bookshelf ask 262 offer 200 round 3: harness '260' -> 260 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 260, 260, 260, 262, 260, 260).
+[seller] bookshelf ask 263 offer 200 round 3: harness '261' -> 261 | Of the 6 earlier buyers of this item whose first offer was closest to this one's: 0 bought, 6 left (the last ask they saw: 261, 260, 260, 262, 260, 260).
 [seller] read offer 230 from '230'
 [seller] journal: bookshelf rejected after 4 offer(s)

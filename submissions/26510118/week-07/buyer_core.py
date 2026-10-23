@@ -10,7 +10,9 @@ The budget is enforced here, not in the prompt, for the reason the seller
 clamps its reserve: a model cannot promise it. Four guards sit around whatever
 the harness answers -- nothing above the budget is ever sent, a price already
 within budget is never walked away from, the clock closes the deal, and a shop
-that has stopped moving is left without asking.
+that has stopped moving is left without asking. One exception to the second:
+a shop that will not come down from a price above the market floor is refusing
+to negotiate, so the buyer leaves, reviews it 2 stars and avoids it after.
 
 Choosing a shop (from reviews and memory):
     code      drops shops that are clearly bad -- verified-looking bad
@@ -49,10 +51,20 @@ EXPLORE = 0.4         # nudge for a shop never traded with, so a new shop can wi
 CROWD = 0.06          # mild penalty per review: among good shops, lean to the less-crowded (hungrier) one
 SHORTLIST = 3         # how many survivors the harness chooses among
 RECENT = 5            # a shop that broke off 2 of my last 5 trades with it (hung, crashed) is avoided
+# The market's reserves, the same for every shop (the market test's RESERVE and
+# the dashboard's minimum prices): no shop may sell below them.
+FLOORS = {"lamp": 100, "chair": 180, "bookshelf": 260}
+REFUSED_STARS = 2     # a shop that will not move from a price above the floor; 1 stays for a wrong receipt
+
+
+_sink: list | None = None   # the Cloudflare buyer collects an order's lines here to store them
 
 
 def log(*parts):
-    print(" ".join(str(p) for p in parts), flush=True)
+    line = " ".join(str(p) for p in parts)
+    print(line, flush=True)
+    if _sink is not None:
+        _sink.append(line)
 
 
 # ------------------------------------------------------------ reading the shop
@@ -133,14 +145,27 @@ def _answer(out: str, fallback):
     return int(m.group(1)) if m else fallback
 
 
-async def choose(ask, item: str, budget: int, price_asked, rounds: int, hist, stalled: bool, started: float):
+async def choose(ask, item: str, budget: int, price_asked, rounds: int, hist, holding: bool, started: float):
     """-> ('accept', price) | ('offer', price) | ('walk', None), guards applied.
-    The cases above the harness call are facts, not judgements."""
+    `holding`: the shop's ask did not come down since my last offer. The cases
+    above the harness call are facts, not judgements."""
     within = price_asked is not None and price_asked <= budget
     if within and rounds >= MAX_ROUNDS:
         log(f"[buyer] last round and {price_asked} fits {budget}; taking it")
         return "accept", price_asked
-    if not within and stalled:
+    if within and holding:
+        # The shop did not come down after my offer. At the market's floor
+        # there is nothing left to come down to -- Ssadassa Shop held at 100
+        # for a lamp, which no shop may go below -- so that is simply the best
+        # price there is. Above the floor it is a refusal to negotiate: leave
+        # at once, and the review and the memory say so.
+        floor = FLOORS.get(item)
+        if floor is not None and price_asked <= floor:
+            log(f"[buyer] {price_asked} is the market floor for a {item} and fits {budget}; taking it")
+            return "accept", price_asked
+        log(f"[buyer] {price_asked} fits {budget} but the shop will not negotiate above the floor; leaving")
+        return "refuse", None
+    if not within and holding:
         log(f"[buyer] {price_asked} is over {budget} and not moving; leaving")
         return "walk", None
     if not within and rounds >= MAX_ROUNDS:
@@ -209,6 +234,8 @@ def why_bad(ws: float | None, past: dict | None) -> str | None:
         return f"my memory: {agg['cheated']} wrong receipt(s)"
     if agg.get("recent_failed", 0) >= 2:
         return f"my memory: {agg['recent_failed']} of my last {RECENT} trades there broke off"
+    if agg.get("recent_refused"):
+        return f"my memory: it would not negotiate above the floor ({agg['recent_refused']} of my last {RECENT})"
     if ws is not None and ws < BAD_STARS:
         return f"reviews: {ws:.1f} stars"
     return None
@@ -292,7 +319,7 @@ async def trade(client, ask, url: str, item: str, budget: int, past: dict | None
     order its deal, never its result line."""
     started = time.time()
     r = {"deal": False, "receipt": None, "price": None, "rounds": 0, "honest": None, "fp": None,
-         "error": None, "problem": None}
+         "error": None, "problem": None, "refused": False, "held_at": None}
     try:
         card = await client.open(url)
         r["fp"] = fingerprint(card)
@@ -306,12 +333,15 @@ async def trade(client, ask, url: str, item: str, budget: int, past: dict | None
         for rounds in range(1, MAX_ROUNDS + 1):
             r["rounds"] = rounds
             asked = await last_number(t, ask)
-            stalled = asked is not None and prev_ask is not None and asked > budget and asked >= prev_ask
+            holding = asked is not None and prev_ask is not None and asked >= prev_ask
             if rounds == 1 and anchor is not None and asked is not None and asked > anchor:
                 what, price = "offer", anchor       # start from what memory says it will take
                 log(f"[market_buyer] opening at remembered low {anchor} (shop asked {asked})")
             else:
-                what, price = await choose(ask, item, budget, asked, rounds, hist, stalled, started)
+                what, price = await choose(ask, item, budget, asked, rounds, hist, holding, started)
+            if what == "refuse":
+                r["refused"], r["held_at"] = True, asked
+                break
             if what == "walk" or price > budget:        # the budget guarantee, in code
                 break
             hist.append((asked, price))
@@ -363,6 +393,9 @@ async def make_review(ask, r: dict) -> tuple[int, str]:
     if r.get("error"):                                  # the shop stopped answering: its fault, nothing to word
         return 2, (f"No deal on the {r['item']} (budget {r['budget']}): the shop stopped answering "
                    f"after {r['rounds']} round(s).")
+    if r.get("refused"):                                # held above the floor: no negotiation to speak of
+        return REFUSED_STARS, (f"No deal on the {r['item']}: the shop held at {r['held_at']} above the market "
+                               f"floor and would not negotiate, so I left after {r['rounds']} round(s).")
     facts = {"deal": r["deal"], "price": r["price"], "budget": r["budget"],
              "rounds": r["rounds"], "receipt_matched": r["honest"]}
     out = await ask(REVIEW_PROMPT.format(item=r["item"], budget=r["budget"], facts=json.dumps(facts)))
@@ -404,6 +437,7 @@ def aggregate(trades: list) -> dict:
         "avg_price_ratio": round(sum(t["price"] / max(1, t["budget"]) for t in priced) / len(priced), 3) if priced else 1.0,
         "cheated": sum(1 for t in trades if t["honest"] is False),
         "recent_failed": sum(1 for t in trades[-RECENT:] if t.get("error")),
+        "recent_refused": sum(1 for t in trades[-RECENT:] if t.get("refused")),
     }
 
 
@@ -425,7 +459,7 @@ def remember(mem: dict, name: str, fp: str | None, url: str, r: dict, stars: int
     e["last_url"] = url
     e["trades"].append({"item": r["item"], "budget": r["budget"], "price": r["price"],
                         "rounds": r["rounds"], "deal": r["deal"], "honest": r["honest"], "stars": stars,
-                        "error": r.get("error")})
+                        "error": r.get("error"), "refused": bool(r.get("refused"))})
     # Keep memory small, but never by forgetting a wrong receipt.
     e["trades"] = [t for t in e["trades"][:-20] if t["honest"] is False] + e["trades"][-20:]
     e["agg"] = aggregate(e["trades"])
