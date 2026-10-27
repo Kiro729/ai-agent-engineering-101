@@ -236,6 +236,25 @@ async def main() -> int:
     mr2 = await asyncio.to_thread(kit.acp_pay, o2, ours_pub["url"], shop_pub, rec2, buyer_key)
     check("settled a second item", bool(mr2))
 
+    say("\n== the shop forgets its sessions between create and complete (an object restart)")
+    class Forgetful(AsyncHTTP):
+        async def post(self, url, body):
+            out = await super().post(url, body)
+            if url.endswith("/checkout_sessions"):
+                checkout.sessions.clear()
+            return out
+    fh = Forgetful()
+    o8 = market.order("bookshelf", 325)
+    rec8 = shop_core.sign_receipt(shop_key, "Kiro Furniture", "bookshelf", 276, "task-h")
+    mr8, why8 = await acp.pay(fh, o8, ours_pub["url"], shop_pub, rec8, buyer_key, log=lambda l: say("    us: " + l))
+    check("settled anyway, from the checkout_jwt in the closed mandate", bool(mr8), str(why8 or mr8))
+    forged = {"payment_data": {"checkout_mandate": {"mandate": {"checkout_jwt": acp.jwt_sign(
+        other_key, {"id": "cs_forged", "item": "lamp", "price": 100, "task": "t", "iat": int(time.time())})}}}}
+    st, out = await checkout.handle("POST", "/acp/checkout_sessions/cs_forged/complete", json.dumps(forged),
+                                    ours_pub["url"])
+    check("a session token signed by another key is not restored", st == 404, out.get("error", ""))
+    await fh.c.aclose()
+
     say("\n== this buyer (acp.pay) -> the kit shop's checkout")
     kit_pub = {"url": ""}
     kit_shop = kit.AcpShop(other_key, None)
@@ -273,9 +292,12 @@ async def main() -> int:
     st, out = await checkout.handle("POST", "/acp/checkout_sessions", json.dumps(
         {"line_items": [{"id": "lamp", "quantity": 1}], "receipt": low}), ours_pub["url"])
     check("shop: a price under the reserve gets no checkout", st == 400, out.get("error", ""))
-    # the shop: one receipt, one checkout
-    st, out = await checkout.handle("POST", "/acp/checkout_sessions", json.dumps(
-        {"line_items": [{"id": "lamp", "quantity": 1}], "receipt": rec}), ours_pub["url"])
+    # the shop: one receipt, one checkout (while the object holds its sessions; after a restart a
+    # second session could open, and it would still sell at the agreed price, never below the reserve)
+    dup = json.dumps({"line_items": [{"id": "lamp", "quantity": 1}],
+                      "receipt": shop_core.sign_receipt(shop_key, "Kiro Furniture", "lamp", 104, "task-dup")})
+    await checkout.handle("POST", "/acp/checkout_sessions", dup, ours_pub["url"])
+    st, out = await checkout.handle("POST", "/acp/checkout_sessions", dup, ours_pub["url"])
     check("shop: a receipt already checked out gets no second session", st == 409, out.get("error", ""))
     # the market: a second settle of a settled order (the shop reports the refusal as 402)
     again = shop_core.sign_receipt(shop_key, "Kiro Furniture", "lamp", 104, "task-g")

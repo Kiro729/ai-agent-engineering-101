@@ -31,6 +31,7 @@ from urllib.parse import urlparse
 RECEIPT_KEYS = ("shop", "item", "price", "task")
 VERSION = "2026-04-17"                                  # the ACP spec version the market's kit speaks
 KEEP_SESSIONS = 500
+KEEP_SECONDS = 3600                                     # a checkout_jwt older than this is not restored
 
 
 def canon(d: dict) -> bytes:
@@ -129,6 +130,8 @@ class Checkout:
         if len(parts) == 1 and method == "POST":
             return self.create(b, public)
         s = self.sessions.get(parts[1]) if len(parts) > 1 else None
+        if s is None and parts[2:] == ["complete"]:
+            s = self.restore(parts[1], b)
         if s is None:
             return 404, {"error": "no such checkout session"}
         if len(parts) == 2:
@@ -139,6 +142,25 @@ class Checkout:
         if parts[2] == "complete" and s["status"] == "ready_for_payment":
             return await self.complete(s, b)
         return 409, {"error": f"session is {s['status']}"}
+
+    def restore(self, sid: str, b: dict) -> dict | None:
+        """A session this shop no longer holds (the object restarted between
+        create and complete), rebuilt from the checkout_jwt the buyer's closed
+        checkout mandate carries: this shop's own signature vouches for it, so
+        nothing needs storing. The market settles an order once, so a replay
+        cannot pay twice; an old token is refused anyway."""
+        cm = (((b.get("payment_data") or {}).get("checkout_mandate") or {}).get("mandate") or {})
+        co = jwt_payload(cm.get("checkout_jwt") or "", self.pub)
+        if not co or co.get("id") != sid or time.time() - co.get("iat", 0) > KEEP_SECONDS:
+            return None
+        self.sessions[sid] = s = {
+            "id": sid, "status": "ready_for_payment", "task": co["task"],
+            "line_items": [{"id": co["item"], "quantity": 1}],
+            "totals": [{"type": "total", "amount": co["price"]}],
+            "capabilities": {"payment_methods": ["ap2-mandate"]},
+            "checkout_jwt": cm["checkout_jwt"]}
+        self.log(f"[acp] session {sid} restored from its signed checkout_jwt")
+        return s
 
     def create(self, b: dict, public: str) -> tuple[int, dict]:
         rec = b.get("receipt") if isinstance(b.get("receipt"), dict) else {}
