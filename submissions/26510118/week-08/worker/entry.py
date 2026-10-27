@@ -1,4 +1,4 @@
-"""Week 07 -- the shop and the buyer on Cloudflare Workers.
+"""Week 08 -- the shop and the buyer on Cloudflare Workers, with Round 3 payments.
 
 The decisions are shop_core and buyer_core, the modules the market test checks
 on the PC (build.py copies them in). This file is what only Cloudflare has:
@@ -19,6 +19,12 @@ on the PC (build.py copies them in). This file is what only Cloudflare has:
                market, takes orders for about 50 s, runs buyer_core on each,
                checks the shop's signature, adds sig_buyer and posts the result.
                Its memory lives in the object's storage.
+    payments   Round 3 counts only settled deals, and the kit that settles them
+               for other students does not run here, so acp.py does it: the
+               shop serves /.well-known/acp.json and /acp/checkout_sessions and
+               forwards completed checkouts to /api/settle under its own shop
+               token (GET /shop/log lists the settlements); the buyer pays its
+               Round 3 deals with closed mandates inside the open ones.
     keys       secrets: SHOP_KEY and BUYER_KEY hold the .pem files whose public
                halves the kit registered; MARKET_OWNER is the GitHub claim code.
     catalogue  the market's three items only (shop_data, built from catalog.json).
@@ -35,6 +41,7 @@ from js import AbortSignal, Object, fetch
 from pyodide.ffi import to_js
 from workers import DurableObject, Response, WorkerEntrypoint
 
+import acp
 import buyer_core
 import catalog
 import market_anchor
@@ -97,6 +104,79 @@ def canon(d: dict) -> bytes:
     return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def kv_table(sql):
+    """A (k, v) table in an object's SQLite: kv(k) reads, kv(k, v) writes."""
+    sql.exec("CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)")
+
+    def kv(k: str, v: str | None = None):
+        if v is not None:
+            sql.exec("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", k, v)
+            return v
+        found = rows(sql.exec("SELECT v FROM kv WHERE k = ?", k))
+        return found[0]["v"] if found else None
+    return kv
+
+
+# ------------------------------------------------------------ the market
+
+class MarketClient:
+    """The market's API in one role (buyer or shop). It joins the way kit v3
+    does -- a signature over a fresh timestamp proves the key -- when the object
+    has no token yet or the market refused it, and keeps the token in kv."""
+
+    def __init__(self, env, kv, key, role: str, url: str | None = None):
+        self.env, self.kv, self.key, self.role, self.url = env, kv, key, role, url
+        self.base = env_str(env, "MARKET_URL").rstrip("/")
+
+    async def join(self) -> str:
+        body = acp.signed_join(self.key, env_str(self.env, "MARKET_NAME"), self.role, self.url,
+                               env_str(self.env, "MARKET_OWNER") or None)
+        r = await fetch(f"{self.base}/api/join", js({"method": "POST", "body": json.dumps(body),
+                                                     "headers": {"Content-Type": "application/json"},
+                                                     "signal": AbortSignal.timeout(30000)}))
+        data = py(await r.json())
+        if r.status != 200 or "token" not in data:
+            raise RuntimeError(f"join as {self.role} failed: {r.status} {str(data)[:200]}")
+        print(f"[market] {self.role} registered as {data.get('name')}, round {data.get('round')}", flush=True)
+        return self.kv("token", data["token"])
+
+    async def call(self, method: str, path: str, body=None):
+        """(status, json) from the market, joining first or again when the token is missing or refused."""
+        for attempt in (1, 2):
+            token = self.kv("token") or await self.join()
+            init = {"method": method, "signal": AbortSignal.timeout(30000),
+                    "headers": {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}}
+            if body is not None:
+                init["body"] = json.dumps(body)
+            r = await fetch(f"{self.base}{path}", js(init))
+            if r.status in (401, 403) and attempt == 1:
+                self.kv("token", "")
+                continue
+            try:
+                return r.status, py(await r.json())
+            except Exception:                           # noqa: BLE001  (not JSON)
+                return r.status, {"text": str(await r.text())[:200]}
+        return 401, {}
+
+
+class FetchHTTP:
+    """acp.pay's transport on fetch: (status, json or None)."""
+
+    async def _go(self, url: str, init: dict):
+        r = await fetch(url, js(dict(init, signal=AbortSignal.timeout(30000))))
+        try:
+            return r.status, py(await r.json())
+        except Exception:                               # noqa: BLE001  (not JSON: the caller says why it stops)
+            return r.status, None
+
+    async def get(self, url: str):
+        return await self._go(url, {"method": "GET"})
+
+    async def post(self, url: str, body: dict):
+        return await self._go(url, {"method": "POST", "body": json.dumps(body),
+                                    "headers": {"Content-Type": "application/json"}})
+
+
 # ------------------------------------------------------------ the harness
 
 async def ask_model(env, prompt: str) -> str:
@@ -156,6 +236,15 @@ class Shop(DurableObject):
                                    market_mean=self.market_mean)
         self.open: dict[str, dict] = {}
         self.stats = {"t": 0.0, "items": {}}
+        # Round 3: checkout sessions live in memory like tasks; each settlement
+        # (or refusal) is one stored row, the shop's half of market-kit.log.
+        self.sql.exec("CREATE TABLE IF NOT EXISTS settles (t REAL, j TEXT)")
+        self.public = env_str(self.env, "SHOP_URL").rstrip("/")
+        self.checkout = self.client = None
+        if self.shop.key is not None:
+            self.client = MarketClient(self.env, kv_table(self.sql), self.shop.key, "shop", self.public)
+            self.checkout = acp.Checkout(self.shop.key, lambda item: (catalog.by_id(item) or {}).get("reserve"),
+                                         self.settle, log=lambda line: print(line, flush=True))
 
     async def ask(self, prompt: str) -> str:
         return await ask_model(self.env, prompt)
@@ -252,6 +341,36 @@ class Shop(DurableObject):
         self._save(task, deal)
         return ok(rid, {"task": task})
 
+    async def settle(self, payload: dict):
+        return await self.client.call("POST", "/api/settle", payload)
+
+    async def acp(self, method: str, path: str, body: str) -> str:
+        """One ACP checkout call -> {"status", "body"} as JSON."""
+        self._setup()
+        if self.checkout is None:
+            return json.dumps({"status": 503, "body": {"error": "The shop is not configured yet (no signing key)."}})
+        status, out = await self.checkout.handle(method, path, body, self.public)
+        rec = out.pop("settle", None) if isinstance(out, dict) else None
+        if rec is not None:
+            self.sql.exec("INSERT INTO settles (t, j) VALUES (?, ?)", time.time(), json.dumps(dict(rec, status=status)))
+        return json.dumps({"status": status, "body": out})
+
+    async def settle_log(self, n: int) -> str:
+        """Settlements newest first, in the kit's log words, with totals."""
+        self._setup()
+        every = [dict(json.loads(r["j"]), t=r["t"]) for r in rows(self.sql.exec("SELECT t, j FROM settles ORDER BY t"))]
+        for s in every:
+            s["line"] = (f"[acp] settled {s['item']} at {s['amount']}, ledger #{s.get('ledger')}" if s["status"] == 200
+                         else f"[acp] settle refused: {s.get('failed') or s['status']}")
+        ok_ = [s for s in every if s["status"] == 200]
+        refused: dict[str, int] = {}
+        for s in every:
+            for f in (s.get("failed") or []) if s["status"] != 200 else []:
+                refused[f] = refused.get(f, 0) + 1
+        return json.dumps({"settled": len(ok_), "refused": len(every) - len(ok_), "refused_checks": refused,
+                           "credits": sum(s["amount"] for s in ok_),
+                           "recent": every[::-1][:max(1, min(int(n), 200))]}, indent=1)
+
 
 # ------------------------------------------------------------ the buyer
 
@@ -307,7 +426,6 @@ class Buyer(DurableObject):
             return
         self.sql = self.ctx.storage.sql
         self.sql.exec("CREATE TABLE IF NOT EXISTS memory (name TEXT PRIMARY KEY, j TEXT)")
-        self.sql.exec("CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT)")
         self.sql.exec("CREATE TABLE IF NOT EXISTS orders (t REAL, j TEXT)")
         self.mem = {r["name"]: json.loads(r["j"]) for r in rows(self.sql.exec("SELECT name, j FROM memory"))}
         if not self.mem:                                # first start: the PC buyer's memory, Round 0 lessons included
@@ -315,54 +433,18 @@ class Buyer(DurableObject):
             for name in self.mem:
                 self._remember(name)
         self.key = load_key(self.env, "BUYER_KEY")
-        self.base = env_str(self.env, "MARKET_URL").rstrip("/")
+        self.client = MarketClient(self.env, kv_table(self.sql), self.key, "buyer") if self.key else None
         self.busy = False
         self.ready = True
 
     def _remember(self, name: str) -> None:
         self.sql.exec("INSERT OR REPLACE INTO memory (name, j) VALUES (?, ?)", name, json.dumps(self.mem[name]))
 
-    def _kv(self, k: str, v: str | None = None):
-        if v is not None:
-            self.sql.exec("INSERT OR REPLACE INTO kv (k, v) VALUES (?, ?)", k, v)
-            return v
-        found = rows(self.sql.exec("SELECT v FROM kv WHERE k = ?", k))
-        return found[0]["v"] if found else None
-
     async def ask(self, prompt: str) -> str:
         return await ask_model(self.env, prompt)
 
-    async def join(self) -> str:
-        from cryptography.hazmat.primitives import serialization
-        pub = self.key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
-        body = {"name": env_str(self.env, "MARKET_NAME"), "role": "buyer", "pubkey": base64.b64encode(pub).decode(),
-                "url": None, "owner": env_str(self.env, "MARKET_OWNER") or None}
-        r = await fetch(f"{self.base}/api/join", js({"method": "POST", "body": json.dumps(body),
-                                                     "headers": {"Content-Type": "application/json"},
-                                                     "signal": AbortSignal.timeout(30000)}))
-        data = py(await r.json())
-        if r.status != 200 or "token" not in data:
-            raise RuntimeError(f"join as buyer failed: {r.status} {str(data)[:200]}")
-        print(f"[market] buyer registered as {data.get('name')}, round {data.get('round')}", flush=True)
-        return self._kv("token", data["token"])
-
     async def market(self, method: str, path: str, body=None):
-        """(status, json) from the market, joining first or again when the token is missing or refused."""
-        for attempt in (1, 2):
-            token = self._kv("token") or await self.join()
-            init = {"method": method, "signal": AbortSignal.timeout(30000),
-                    "headers": {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}}
-            if body is not None:
-                init["body"] = json.dumps(body)
-            r = await fetch(f"{self.base}{path}", js(init))
-            if r.status in (401, 403) and attempt == 1:
-                self._kv("token", "")
-                continue
-            try:
-                return r.status, py(await r.json())
-            except Exception:                           # noqa: BLE001  (not JSON)
-                return r.status, {"text": str(await r.text())[:200]}
-        return 401, {}
+        return await self.client.call(method, path, body)
 
     def _verify_seller(self, pubkey_b64: str, receipt: dict) -> bool:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -387,13 +469,20 @@ class Buyer(DurableObject):
 
     async def _handle(self, o: dict) -> None:
         say = buyer_core.log
-        say(f"[order {o['order']}] {o['item']}, budget {o['budget']}, round {o['round']}")
+        # Round 3: the budget is the open payment mandate's limit, the one the
+        # market enforces at settlement; never more than the order says either.
+        limit = acp.mandate_limit(o) if o.get("mandates") else None
+        budget = o.get("budget") if o.get("budget") is not None else limit
+        if limit is not None:
+            budget = min(budget, limit)
+        say(f"[order {o['order']}] {o['item']}, budget {budget}, round {o['round']}"
+            + (f", mandate limit {limit}" if limit is not None else ""))
         status, data = await self.market("GET", "/api/shops")
         own = env_str(self.env, "SHOP_URL").rstrip("/")
         shops = [s for s in data.get("shops", []) if s["url"].rstrip("/") != own]
         pubkeys = {s["url"]: s["pubkey"] for s in shops}
         lst = [{"name": s["name"], "url": s["url"], "reviews": s["reviews"]} for s in shops]
-        out, changed = await buyer_core.shop_once(self.ask, FetchA2A(), lst, self.mem, o["item"], o["budget"])
+        out, changed = await buyer_core.shop_once(self.ask, FetchA2A(), lst, self.mem, o["item"], budget)
         if changed:
             self._remember(changed)
 
@@ -412,13 +501,16 @@ class Buyer(DurableObject):
             elif not self._verify_seller(pubkeys[shop_url], receipt):
                 say("[sign] sig_seller does not verify with the shop's registered key")
             elif receipt.get("item") != o["item"] or not isinstance(receipt.get("price"), int) \
-                    or receipt["price"] > o["budget"]:
+                    or receipt["price"] > budget:
                 say(f"[sign] receipt {receipt.get('item')} at {receipt.get('price')} does not fit the order, "
                     f"not signing")
             else:
                 signed = dict({k: receipt[k] for k in RECEIPT_KEYS}, order=o["order"])
                 body["sig_buyer"] = base64.b64encode(self.key.sign(canon(signed))).decode()
                 say("[sign] sig_seller ok, sig_buyer added")
+                if o["round"] >= 3 and o.get("mandates"):
+                    body["mandate_receipt"] = await acp.pay(FetchHTTP(), o, shop_url, pubkeys[shop_url],
+                                                            receipt, self.key, log=say)
         status, res = await self.market("POST", "/api/results", body)
         if status != 200:
             say(f"[market] result refused: {status} {str(res)[:200]}")
@@ -427,7 +519,8 @@ class Buyer(DurableObject):
         if res:
             say(f"[market] ledger #{res.get('ledger')}: {deal}, stars {out.get('stars')}, verified {res.get('verified')}")
         self.sql.exec("INSERT INTO orders (t, j) VALUES (?, ?)", time.time(), json.dumps({
-            "order": o["order"], "item": o["item"], "budget": o["budget"], "shop": shop_url, "deal": deal,
+            "order": o["order"], "round": o["round"], "item": o["item"], "budget": budget, "shop": shop_url,
+            "deal": deal, "settled": bool(body.get("mandate_receipt")),
             "stars": out.get("stars"), "ledger": res.get("ledger"), "verified": res.get("verified"),
             "log": [line for line in buyer_core._sink if ": stars " not in line][-60:]}))
 
@@ -437,7 +530,7 @@ class Buyer(DurableObject):
         if env_str(self.env, "BUYER_ENABLED") != "1":
             return "disabled"                           # before _setup: a disabled buyer seeds nothing
         self._setup()
-        if self.key is None:
+        if self.client is None:
             return "no BUYER_KEY"
         if self.busy:
             return "busy"
@@ -479,6 +572,9 @@ class Buyer(DurableObject):
             "logged": len(logged),
             "refused": sum(1 for o in logged if any("held" in l and "leaving" in l for l in o["log"])),
             "broke_off": sum(1 for o in logged if any("broke off" in l for l in o["log"])),
+            "round3_orders": sum(1 for _, o in every if (o.get("round") or 0) >= 3),
+            "round3_deals": sum(1 for _, o in every if (o.get("round") or 0) >= 3 and o["deal"] != "no deal"),
+            "settled": sum(1 for _, o in every if o.get("settled")),
         }
         recent = [{k: v for k, v in o.items() if k != "log"} for _, o in every[-20:][::-1]]
         return json.dumps({"enabled": env_str(self.env, "BUYER_ENABLED") == "1", "busy": self.busy,
@@ -496,9 +592,20 @@ class Buyer(DurableObject):
 class Default(WorkerEntrypoint):
     async def fetch(self, request):
         u = urlparse(request.url)
+        shop = self.env.SHOP.get(self.env.SHOP.idFromName("shop"))
+        if u.path == "/.well-known/acp.json":
+            public = env_str(self.env, "SHOP_URL") or f"{u.scheme}://{u.netloc}"
+            return Response(json.dumps(acp.descriptor(public)), headers={"content-type": "application/json"})
+        if u.path.startswith("/acp/"):
+            body = await request.text() if request.method == "POST" else ""
+            out = json.loads(await shop.acp(request.method, u.path, body))
+            return Response(json.dumps(out["body"]), status=out["status"], headers={"content-type": "application/json"})
         if request.method == "POST":
-            stub = self.env.SHOP.get(self.env.SHOP.idFromName("shop"))
-            return Response(await stub.rpc(await request.text()), headers={"content-type": "application/json"})
+            return Response(await shop.rpc(await request.text()), headers={"content-type": "application/json"})
+        if u.path == "/shop/log":
+            n = parse_qs(u.query).get("n", ["20"])[0]
+            return Response(await shop.settle_log(int(n) if n.isdigit() else 20),
+                            headers={"content-type": "application/json"})
         if u.path == "/.well-known/agent-card.json":
             description, skill = shop_core.card_text(shop_core.NAME)
             card = {

@@ -1,12 +1,13 @@
-"""Assemble worker/src from the week-07 sources, so the Cloudflare shop runs
+"""Assemble worker/src from the week-08 sources, so the Cloudflare shop runs
 the very code the market test checks on the PC.
 
     python build.py                 # then, from this folder:
     uv run pywrangler deploy
 
     copied     shop_core, buyer_core, catalog, prices, negotiation_memory,
-               market_anchor (the shared shop and buyer) and entry.py (what
-               only Cloudflare has)
+               market_anchor, acp (the shared shop, buyer and Round 3
+               payments; acp_test.py checks acp against the kit) and entry.py
+               (what only Cloudflare has)
     generated  shop_data.py: the market's three catalogue items, the
                repriced asks (asks.json), the PC's negotiation journal and the
                PC buyer's memory (.market/memory.json), which seed the Durable
@@ -20,7 +21,7 @@ W = Path(__file__).resolve().parent
 WEEK = W.parent
 SRC = W / "src"
 SHARED = ["shop_core.py", "buyer_core.py", "catalog.py", "prices.py", "negotiation_memory.py",
-          "market_anchor.py"]
+          "market_anchor.py", "acp.py"]
 MARKET_ITEMS = ("lamp", "chair", "bookshelf")
 
 
