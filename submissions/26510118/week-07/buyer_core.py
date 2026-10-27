@@ -325,7 +325,7 @@ async def trade(client, ask, url: str, item: str, budget: int, past: dict | None
     order its deal, never its result line."""
     started = time.time()
     r = {"deal": False, "receipt": None, "price": None, "rounds": 0, "honest": None, "fp": None,
-         "error": None, "problem": None, "refused": False, "held_at": None}
+         "error": None, "problem": None, "refused": False, "held_at": None, "low_ask": None}
     try:
         card = await client.open(url)
         r["fp"] = fingerprint(card)
@@ -339,6 +339,8 @@ async def trade(client, ask, url: str, item: str, budget: int, past: dict | None
         for rounds in range(1, MAX_ROUNDS + 1):
             r["rounds"] = rounds
             asked = await last_number(t, ask)
+            if asked is not None:                       # the no-deal review names it
+                r["low_ask"] = asked if r["low_ask"] is None else min(r["low_ask"], asked)
             holding = asked is not None and prev_ask is not None and asked >= prev_ask
             holds = holds + 1 if holding else 0
             if rounds == 1 and anchor is not None and asked is not None and asked > anchor:
@@ -378,9 +380,8 @@ review for other buyers, naming the real numbers.
 
 What happened: {facts}
 
-A no deal only because the budget was below the shop's price is not the shop's fault;
-keep such a review neutral rather than negative. Paying the full budget with no
-discount is not a good deal either; rate it 3 or below.
+market_floor is the lowest price any shop may sell this item at, so paying it is the
+best price this market has. Paying the whole budget is not a good deal; rate it 3 or below.
 
 Reply with ONE line of JSON and nothing else:
 {{"stars": <whole number 1-5>, "review": "<one sentence: the price vs budget, the rounds, and whether the receipt matched>"}}"""
@@ -396,6 +397,20 @@ def derive_stars(r: dict) -> int:
     return 5 if ratio <= 0.75 else 4 if ratio <= 0.9 else 3
 
 
+def no_deal_review(r: dict) -> str:
+    """A no-deal review in code. There is nothing to judge (the stars are fixed),
+    and the harness, asked to say whether the receipt matched, wrote "the receipt
+    did not match" into 623 of 844 no-deal reviews where there was no receipt."""
+    item, budget, rounds, low = r["item"], r["budget"], r["rounds"], r.get("low_ask")
+    if rounds == 0:
+        return f"No deal on the {item} (budget {budget}): the shop did not open a negotiation."
+    if low is not None and low > budget:
+        return f"No deal on the {item}: the lowest ask was {low}, above my budget of {budget}, after {rounds} round(s)."
+    if low is not None:
+        return f"No deal on the {item} within my budget of {budget} after {rounds} round(s); the lowest ask was {low}."
+    return f"No deal on the {item} within my budget of {budget} after {rounds} round(s)."
+
+
 async def make_review(ask, r: dict) -> tuple[int, str]:
     if r.get("error"):                                  # the shop stopped answering: its fault, nothing to word
         return 2, (f"No deal on the {r['item']} (budget {r['budget']}): the shop stopped answering "
@@ -403,7 +418,9 @@ async def make_review(ask, r: dict) -> tuple[int, str]:
     if r.get("refused"):                                # held above the floor: no negotiation to speak of
         return REFUSED_STARS, (f"No deal on the {r['item']}: the shop held at {r['held_at']} above the market "
                                f"floor and would not negotiate, so I left after {r['rounds']} round(s).")
-    facts = {"deal": r["deal"], "price": r["price"], "budget": r["budget"],
+    if not r["deal"]:
+        return 3, no_deal_review(r)                     # no deal because the budget was below the price is not its fault
+    facts = {"deal": r["deal"], "price": r["price"], "budget": r["budget"], "market_floor": FLOORS.get(r["item"]),
              "rounds": r["rounds"], "receipt_matched": r["honest"]}
     out = await ask(REVIEW_PROMPT.format(item=r["item"], budget=r["budget"], facts=json.dumps(facts)))
     stars, review = None, None
@@ -418,18 +435,20 @@ async def make_review(ask, r: dict) -> tuple[int, str]:
         except Exception:                               # noqa: BLE001
             pass
     stars = min(5, max(1, stars if stars is not None else derive_stars(r)))     # always a whole 1-5
-    if not r["deal"]:
-        stars = 3            # no deal because the budget was below the shop's price is not its fault
-    elif r["honest"] is False:
+    if r["honest"] is False:
         stars = 1            # a wrong receipt is never rewarded, whatever the model felt
     elif r["price"] is not None and r["price"] >= r["budget"]:
         stars = min(stars, 3)   # paid the full budget (the last-round max offer): a squeeze, not a good deal
+    elif r["price"] is not None:
+        # gpt-4o-mini gave 3 to 855 honest deals under budget, 576 of them at the
+        # market floor: a good price is never rated below what the price alone earns
+        stars = max(stars, derive_stars(r))
+        floor = FLOORS.get(r["item"])
+        if floor is not None and r["price"] <= int(floor * FLOOR_TOLERANCE):
+            stars = max(stars, 4)   # the lowest price this market has
     if not review:                                      # never empty
-        if r["deal"]:
-            review = (f"Bought the {r['item']} at {r['price']} of {r['budget']} budget in {r['rounds']} rounds; "
-                      + ("receipt matched." if r["honest"] else "receipt did not match."))
-        else:
-            review = f"No deal on the {r['item']} within {r['budget']} after {r['rounds']} rounds."
+        review = (f"Bought the {r['item']} at {r['price']} of {r['budget']} budget in {r['rounds']} rounds; "
+                  + ("receipt matched." if r["honest"] else "receipt did not match."))
     return stars, review
 
 

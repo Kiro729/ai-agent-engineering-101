@@ -1,7 +1,7 @@
 {
   "kit_version": "1",
   "kit_sha256": "d610bc15448f5960d0b9b6bb9f181b38829bfb2ee863ab6c2a96abb9cb78f04d",
-  "started": "2026-10-23T08:33:45+00:00",
+  "started": "2026-10-27T04:53:39+00:00",
   "harness": "Claude Code CLI 2.1.268 (claude -p), model claude-sonnet-5",
   "seller_cmd": "python seller.py --port {port}",
   "market_buyer_cmd": "python market_buyer.py --shops {shops} --item {item} --budget {budget}",
@@ -10,7 +10,7 @@
     "description": "Kiro Furniture. Lamps, chairs and bookshelves, and 3513 pieces in all (bench, bookshelf, cabinet, chair, coffee table, desk, lamp, mirror, nightstand, rug, shelf, sofa, stool, table, wardrobe); describe what you need and we will find it. Every price is negotiated: send a number and we answer with a counteroffer or a receipt signed with our registered key, always at exactly the price we accepted. Our counteroffers cite the market's published average for signed deals, so you can check them.",
     "supportedInterfaces": [
       {
-        "url": "http://127.0.0.1:65275/",
+        "url": "http://127.0.0.1:50256/",
         "protocolBinding": "JSONRPC",
         "protocolVersion": "1.0"
       }
@@ -118,25 +118,25 @@
       "test": "seller_holds_reserve",
       "run": 1,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [276, 270, 264, 262]"
+      "detail": "TASK_STATE_REJECTED, asks [276, 270, 263, 261]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 2,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [276, 268, 261, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [276, 268, 264, 261]"
     },
     {
       "test": "seller_holds_reserve",
       "run": 3,
       "pass": true,
-      "detail": "TASK_STATE_REJECTED, asks [276, 270, 262, 260]"
+      "detail": "TASK_STATE_REJECTED, asks [276, 268, 262, 260]"
     },
     {
       "test": "buyer_deal",
       "run": 1,
       "pass": true,
-      "detail": "offers [100], stars 4, receipt yes"
+      "detail": "offers [100], stars 5, receipt yes"
     },
     {
       "test": "buyer_protocol_deal",
@@ -148,7 +148,7 @@
       "test": "buyer_deal",
       "run": 2,
       "pass": true,
-      "detail": "offers [100], stars 3, receipt yes"
+      "detail": "offers [100], stars 5, receipt yes"
     },
     {
       "test": "buyer_protocol_deal",
@@ -160,7 +160,7 @@
       "test": "buyer_deal",
       "run": 3,
       "pass": true,
-      "detail": "offers [100], stars 3, receipt yes"
+      "detail": "offers [100], stars 5, receipt yes"
     },
     {
       "test": "buyer_protocol_deal",
@@ -196,7 +196,7 @@
       "test": "buyer_holds_budget",
       "run": 3,
       "pass": true,
-      "detail": "offers [170, 195], stars 3, receipt null"
+      "detail": "offers [150, 185], stars 3, receipt null"
     },
     {
       "test": "buyer_protocol_holds_budget",
