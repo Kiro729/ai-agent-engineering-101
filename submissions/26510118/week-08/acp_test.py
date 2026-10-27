@@ -36,6 +36,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 import acp
+import buyer_core
 import catalog
 import shop_core
 
@@ -242,20 +243,27 @@ async def main() -> int:
     kit_shop.market = KitMarket(market, kit_pub["url"], acp.pub_b64(other_key), buyer_pub)
     o3 = market.order("lamp", 125)
     rec3 = shop_core.sign_receipt(other_key, "Kit Shop", "lamp", 110, "task-c")
-    mr3 = await acp.pay(http, o3, kit_pub["url"], acp.pub_b64(other_key), rec3, buyer_key, log=lambda l: say("    us: " + l))
-    check("settled", bool(mr3), f"mandate receipt {mr3}")
+    mr3, why3 = await acp.pay(http, o3, kit_pub["url"], acp.pub_b64(other_key), rec3, buyer_key,
+                              log=lambda l: say("    us: " + l))
+    check("settled", bool(mr3) and why3 is None, f"mandate receipt {mr3}")
 
     say("\n== refusals")
     # the buyer: a checkout above the open mandate's limit is never paid
     o4 = market.order("lamp", 100)
     rec4 = shop_core.sign_receipt(other_key, "Kit Shop", "lamp", 110, "task-d")
-    mr4 = await acp.pay(http, o4, kit_pub["url"], acp.pub_b64(other_key), rec4, buyer_key, log=lambda l: say("    us: " + l))
-    check("buyer: total over the mandate's limit is not paid", mr4 is None)
+    mr4, why4 = await acp.pay(http, o4, kit_pub["url"], acp.pub_b64(other_key), rec4, buyer_key,
+                              log=lambda l: say("    us: " + l))
+    check("buyer: total over the mandate's limit is not paid", mr4 is None and why4 == "over_limit", why4)
     # the buyer: a checkout signed by another key than the shop's registered one
     o5 = market.order("lamp", 125)
     rec5 = shop_core.sign_receipt(other_key, "Kit Shop", "lamp", 110, "task-e")
-    mr5 = await acp.pay(http, o5, kit_pub["url"], shop_pub, rec5, buyer_key, log=lambda l: say("    us: " + l))
-    check("buyer: forged checkout (wrong shop key) is not paid", mr5 is None)
+    mr5, why5 = await acp.pay(http, o5, kit_pub["url"], shop_pub, rec5, buyer_key, log=lambda l: say("    us: " + l))
+    check("buyer: forged checkout (wrong shop key) is not paid", mr5 is None and why5 == "checkout_mismatch", why5)
+    # the buyer: a shop with no checkout at all (what this Worker served before week 8)
+    bare = serve(Starlette(routes=[Route("/{p:path}", lambda request: JSONResponse("A2A only"), methods=["GET"])]))
+    mr7, why7 = await acp.pay(http, market.order("lamp", 125), bare, shop_pub, rec5, buyer_key,
+                              log=lambda l: say("    us: " + l))
+    check("buyer: a shop without a checkout is reported as the shop's fault", mr7 is None and why7 in acp.SHOP_FAULT, why7)
     # the shop: a receipt another shop signed
     st, out = await checkout.handle("POST", "/acp/checkout_sessions", json.dumps(
         {"line_items": [{"id": "lamp", "quantity": 1}], "receipt": rec3}), ours_pub["url"])
@@ -273,6 +281,28 @@ async def main() -> int:
     again = shop_core.sign_receipt(shop_key, "Kiro Furniture", "lamp", 104, "task-g")
     mr6 = await asyncio.to_thread(kit.acp_pay, o, ours_pub["url"], shop_pub, again, buyer_key)
     check("market: the same order cannot settle twice", mr6 is None)
+
+    say("\n== the buyer's review and memory after a deal that did not settle")
+    async def model(prompt):                            # the harness, pinned: a happy 4-star review
+        return json.dumps({"stars": 4, "review": "Bought the lamp at 100 of 125, receipt matched."})
+    deal = {"deal": True, "honest": True, "price": 100, "budget": 125, "rounds": 2, "item": "lamp",
+            "receipt": rec, "error": None, "refused": False, "fp": "f"}
+    s0, r0 = await buyer_core.make_review(model, dict(deal))
+    s1, r1 = await buyer_core.make_review(model, dict(deal, settled=False, unsettled_why="no_checkout"))
+    s2, r2 = await buyer_core.make_review(model, dict(deal, settled=False, unsettled_why="not_completed"))
+    say(f"    round 2 (nothing to pay): {s0} | {r0}")
+    say(f"    no checkout:              {s1} | {r1}")
+    say(f"    market refused:           {s2} | {r2}")
+    check("review: Round 2 deals are untouched", s0 >= 4 and "settle" not in r0)
+    check("review: the shop's fault caps the stars and says why",
+          s1 <= buyer_core.UNSETTLED_STARS and "no ACP checkout" in r1)
+    check("review: an unclear refusal is told, not blamed", s2 == s0 and "did not settle" in r2)
+    mem: dict = {}
+    for _ in range(2):
+        buyer_core.remember(mem, "no-checkout-shop", "f", "https://x", dict(deal, settled=False,
+                            unsettled_why="no_checkout"), s1)
+    why = buyer_core.why_bad(4.8, mem["no-checkout-shop"])
+    check("memory: two unsettled deals in the last five and the shop is avoided", bool(why), why or "")
 
     await http.c.aclose()
     passed = sum(ok for _, ok, _ in results)

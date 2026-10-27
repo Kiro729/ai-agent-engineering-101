@@ -456,6 +456,34 @@ class Buyer(DurableObject):
         except Exception:                               # noqa: BLE001
             return False
 
+    @staticmethod
+    def _normalized(receipt):
+        """The receipt in the market's field names and types, in place."""
+        if isinstance(receipt, dict) and "seller" in receipt and "shop" not in receipt:
+            receipt["shop"] = receipt.pop("seller")
+        if isinstance(receipt, dict) and isinstance(receipt.get("price"), float) and receipt["price"].is_integer():
+            receipt["price"] = int(receipt["price"])    # data Parts carry numbers as doubles
+        return receipt
+
+    def _sign_buyer(self, o: dict, budget: int, shop_url: str, receipt, pubkeys: dict) -> str | None:
+        """sig_buyer when the receipt is the registered shop's and fits the order, as the kit checks it."""
+        say = buyer_core.log
+        if not isinstance(receipt, dict):
+            return None
+        if not receipt.get("sig_seller"):
+            say("[sign] receipt has no sig_seller")
+        elif shop_url not in pubkeys:
+            say(f"[sign] {shop_url} is not a registered shop")
+        elif not self._verify_seller(pubkeys[shop_url], receipt):
+            say("[sign] sig_seller does not verify with the shop's registered key")
+        elif receipt.get("item") != o["item"] or not isinstance(receipt.get("price"), int) or receipt["price"] > budget:
+            say(f"[sign] receipt {receipt.get('item')} at {receipt.get('price')} does not fit the order, not signing")
+        else:
+            signed = dict({k: receipt[k] for k in RECEIPT_KEYS}, order=o["order"])
+            say("[sign] sig_seller ok, sig_buyer added")
+            return base64.b64encode(self.key.sign(canon(signed))).decode()
+        return None
+
     async def handle(self, o: dict) -> None:
         """One order, as the kit's handle_order does it for Round 1 and later. Its
         log lines are kept with the order (GET /buyer/log), because a cron
@@ -482,35 +510,33 @@ class Buyer(DurableObject):
         shops = [s for s in data.get("shops", []) if s["url"].rstrip("/") != own]
         pubkeys = {s["url"]: s["pubkey"] for s in shops}
         lst = [{"name": s["name"], "url": s["url"], "reviews": s["reviews"]} for s in shops]
-        out, changed = await buyer_core.shop_once(self.ask, FetchA2A(), lst, self.mem, o["item"], budget)
+        paid: dict = {}                                 # what the payment step adds to the result line
+
+        async def settle(chosen: dict, r: dict):
+            """The kit's checks and sig_buyer, then the Round 3 payment -- run
+            inside shop_once, before the review, so the review can say a deal
+            did not settle. -> (settled, why), (None, None) when nothing to pay."""
+            shop_url, receipt = str(chosen["url"]).rstrip("/"), self._normalized(r.get("receipt"))
+            sig = self._sign_buyer(o, budget, shop_url, receipt, pubkeys)
+            if sig is None:
+                return None, None
+            paid["sig_buyer"] = sig
+            if o["round"] < 3 or not o.get("mandates"):
+                return None, None
+            if r.get("honest") is False:                # never pay a receipt above the agreed price
+                say("[acp] the receipt does not match the agreed price; not paying")
+                return False, "wrong_receipt"
+            mr, why = await acp.pay(FetchHTTP(), o, shop_url, pubkeys[shop_url], receipt, self.key, log=say)
+            paid["mandate_receipt"] = mr
+            return mr is not None, why
+
+        out, changed = await buyer_core.shop_once(self.ask, FetchA2A(), lst, self.mem, o["item"], budget, settle)
         if changed:
             self._remember(changed)
 
-        shop_url, receipt = str(out["shop"]).rstrip("/"), out.get("receipt")
-        if isinstance(receipt, dict) and "seller" in receipt and "shop" not in receipt:
-            receipt["shop"] = receipt.pop("seller")
-        if isinstance(receipt, dict) and isinstance(receipt.get("price"), float) and receipt["price"].is_integer():
-            receipt["price"] = int(receipt["price"])    # data Parts carry numbers as doubles
-        body = {"order": o["order"], "shop": shop_url, "receipt": receipt,
-                "stars": out.get("stars"), "review": out.get("review")}
-        if isinstance(receipt, dict):
-            if not receipt.get("sig_seller"):
-                say("[sign] receipt has no sig_seller")
-            elif shop_url not in pubkeys:
-                say(f"[sign] {shop_url} is not a registered shop")
-            elif not self._verify_seller(pubkeys[shop_url], receipt):
-                say("[sign] sig_seller does not verify with the shop's registered key")
-            elif receipt.get("item") != o["item"] or not isinstance(receipt.get("price"), int) \
-                    or receipt["price"] > budget:
-                say(f"[sign] receipt {receipt.get('item')} at {receipt.get('price')} does not fit the order, "
-                    f"not signing")
-            else:
-                signed = dict({k: receipt[k] for k in RECEIPT_KEYS}, order=o["order"])
-                body["sig_buyer"] = base64.b64encode(self.key.sign(canon(signed))).decode()
-                say("[sign] sig_seller ok, sig_buyer added")
-                if o["round"] >= 3 and o.get("mandates"):
-                    body["mandate_receipt"] = await acp.pay(FetchHTTP(), o, shop_url, pubkeys[shop_url],
-                                                            receipt, self.key, log=say)
+        shop_url, receipt = str(out["shop"]).rstrip("/"), self._normalized(out.get("receipt"))
+        body = dict({"order": o["order"], "shop": shop_url, "receipt": receipt,
+                     "stars": out.get("stars"), "review": out.get("review")}, **paid)
         status, res = await self.market("POST", "/api/results", body)
         if status != 200:
             say(f"[market] result refused: {status} {str(res)[:200]}")

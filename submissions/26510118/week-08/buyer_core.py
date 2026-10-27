@@ -38,6 +38,7 @@ import os
 import re
 import time
 
+import acp
 import prices
 
 MAX_ROUNDS = int(os.environ.get("BUYER_ROUNDS", "4"))
@@ -59,6 +60,7 @@ FLOOR_TOLERANCE = 1.03  # within 3% of the floor counts as the floor: that is th
                         # (102, 183, 265 on 10-23), so a shop holding there is fair, not stubborn
 REFUSE_AFTER = 2      # holds in a row above that before it is a refusal; one repeat can be a tactic
 REFUSED_STARS = 2     # a shop that will not move from a price above the floor; 1 stays for a wrong receipt
+UNSETTLED_STARS = 2   # Round 3: a deal the shop's checkout kept from settling (no checkout, a forged one)
 
 
 _sink: list | None = None   # the Cloudflare buyer collects an order's lines here to store them
@@ -242,6 +244,8 @@ def why_bad(ws: float | None, past: dict | None) -> str | None:
         return f"my memory: {agg['recent_failed']} of my last {RECENT} trades there broke off"
     if agg.get("recent_refused"):
         return f"my memory: it would not negotiate above the floor ({agg['recent_refused']} of my last {RECENT})"
+    if agg.get("recent_unsettled", 0) >= 2:             # Round 3 counts only settled deals
+        return f"my memory: {agg['recent_unsettled']} of my last {RECENT} deals there could not settle"
     if ws is not None and ws < BAD_STARS:
         return f"reviews: {ws:.1f} stars"
     return None
@@ -449,6 +453,13 @@ async def make_review(ask, r: dict) -> tuple[int, str]:
     if not review:                                      # never empty
         review = (f"Bought the {r['item']} at {r['price']} of {r['budget']} budget in {r['rounds']} rounds; "
                   + ("receipt matched." if r["honest"] else "receipt did not match."))
+    if r.get("settled") is False:                       # Round 3: agreed, but never paid, so it does not count
+        why = r.get("unsettled_why")
+        if why in acp.SHOP_FAULT:
+            stars = min(stars, UNSETTLED_STARS)
+            review = f"{review.rstrip('.')}. The deal could not settle: {acp.SHOP_FAULT[why]}."
+        else:                                           # the market's refusal can be my fault too: no blame
+            review = f"{review.rstrip('.')}. The payment did not settle."
     return stars, review
 
 
@@ -464,6 +475,7 @@ def aggregate(trades: list) -> dict:
         "cheated": sum(1 for t in trades if t["honest"] is False),
         "recent_failed": sum(1 for t in trades[-RECENT:] if t.get("error")),
         "recent_refused": sum(1 for t in trades[-RECENT:] if t.get("refused")),
+        "recent_unsettled": sum(1 for t in trades[-RECENT:] if t.get("unsettled")),
     }
 
 
@@ -485,7 +497,8 @@ def remember(mem: dict, name: str, fp: str | None, url: str, r: dict, stars: int
     e["last_url"] = url
     e["trades"].append({"item": r["item"], "budget": r["budget"], "price": r["price"],
                         "rounds": r["rounds"], "deal": r["deal"], "honest": r["honest"], "stars": stars,
-                        "error": r.get("error"), "refused": bool(r.get("refused"))})
+                        "error": r.get("error"), "refused": bool(r.get("refused")),
+                        "unsettled": r.get("settled") is False, "unsettled_why": r.get("unsettled_why")})
     # Keep memory small, but never by forgetting a wrong receipt.
     e["trades"] = [t for t in e["trades"][:-20] if t["honest"] is False] + e["trades"][-20:]
     e["agg"] = aggregate(e["trades"])
@@ -494,15 +507,21 @@ def remember(mem: dict, name: str, fp: str | None, url: str, r: dict, stars: int
 
 # ------------------------------------------------------------ one order
 
-async def shop_once(ask, client, shops: list, mem: dict, item: str, budget: int) -> tuple[dict, str | None]:
-    """Pick a shop, trade, review, remember. -> (the kit's result line, the
-    name of the shop whose memory changed)."""
+async def shop_once(ask, client, shops: list, mem: dict, item: str, budget: int,
+                    settle=None) -> tuple[dict, str | None]:
+    """Pick a shop, trade, (pay,) review, remember. -> (the kit's result line,
+    the name of the shop whose memory changed). `settle(shop, r)` is the
+    payment step where this code runs it, not the kit (the Worker): an async
+    call -> (settled, why), (None, None) when the round has no payment. The
+    review then comes after the payment, so it can say a deal did not count."""
     if not shops:
         return {"shop": "", "receipt": None, "stars": 3, "review": "No shops in the market."}, None
     chosen = await select(ask, shops, mem, item, budget)
     log(f"[market_buyer] chose {chosen['name']} {chosen['url']}")
     r = await trade(client, ask, chosen["url"], item, budget, mem.get(chosen["name"]))
     r["item"], r["budget"] = item, budget
+    if settle is not None and r["deal"]:
+        r["settled"], r["unsettled_why"] = await settle(chosen, r)
     stars, review = await make_review(ask, r)
     remember(mem, chosen["name"], r["fp"], chosen["url"], r, stars)
     return {"shop": chosen["url"], "receipt": r["receipt"], "stars": stars, "review": review}, chosen["name"]

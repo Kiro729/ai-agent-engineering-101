@@ -194,32 +194,42 @@ def mandate_limit(order: dict) -> int | None:
         return None
 
 
-async def pay(http, order: dict, shop_url: str, shop_pub: str, receipt: dict, buyer_key, log=print) -> dict | None:
+# Why a payment did not happen. The first four are the shop's doing; the rest
+# are not clearly anyone's (a market refusal can also be this buyer's fault).
+SHOP_FAULT = {"no_checkout": "the shop serves no ACP checkout",
+              "foreign_endpoint": "its checkout is on another host",
+              "checkout_refused": "the shop refused to open a checkout",
+              "checkout_mismatch": "its checkout did not match the agreed receipt"}
+
+
+async def pay(http, order: dict, shop_url: str, shop_pub: str, receipt: dict, buyer_key,
+              log=print) -> tuple[dict | None, str | None]:
     """Open the shop's checkout, check it, sign the closed mandates, complete.
-    -> the market's mandate receipt, or None (the deal then cannot count).
+    -> (the market's mandate receipt, None), or (None, why) and the deal then
+    cannot count: a SHOP_FAULT key, "over_limit", "not_completed" or "error".
     `http.get(url)` and `http.post(url, body)` return (status, json or None)."""
     try:
         status, card = await http.get(f"{shop_url}/.well-known/acp.json")
         if status != 200 or not isinstance(card, dict) or not card.get("endpoint"):
             log(f"[acp] {shop_url} serves no /.well-known/acp.json ({status}); this deal cannot settle")
-            return None
+            return None, "no_checkout"
         base = card["endpoint"].rstrip("/")
         if urlparse(base).hostname != urlparse(shop_url).hostname:
             log(f"[acp] the ACP endpoint {base} is not on the shop's host; not paying")
-            return None
+            return None, "foreign_endpoint"
         status, s = await http.post(f"{base}/checkout_sessions",
                                     {"line_items": [{"id": receipt["item"], "quantity": 1}], "receipt": receipt})
         if status not in (200, 201) or not isinstance(s, dict):
             log(f"[acp] checkout refused: {status} {str(s)[:200]}")
-            return None
+            return None, "checkout_refused"
         co = jwt_payload(s.get("checkout_jwt", ""), shop_pub)
         limit = mandate_limit(order)
         if not co or (co.get("item"), co.get("price"), co.get("task")) != (receipt["item"], receipt["price"], receipt["task"]):
             log("[acp] the checkout does not match the agreed receipt (or is not signed by the shop); not paying")
-            return None
+            return None, "checkout_mismatch"
         if limit is None or co["price"] > limit:        # the mandate's limit, in code: never paid above it
             log(f"[acp] checkout total {co['price']} is above the mandate's limit {limit}; not paying")
-            return None
+            return None, "over_limit"
         h = b64url(hashlib.sha256(s["checkout_jwt"].encode()).digest())
         opens = {k: hashlib.sha256(canon(v["mandate"])).hexdigest() for k, v in order["mandates"].items()}
         cm = {"vct": "mandate.checkout.1", "order": order["order"], "open_mandate": opens["checkout"],
@@ -232,10 +242,10 @@ async def pay(http, order: dict, shop_url: str, shop_pub: str, receipt: dict, bu
                                                          "payment_mandate": sign(pm)}})
         if status != 200 or not isinstance(done, dict):
             log(f"[acp] payment not completed: {status} {str(done)[:300]}")
-            return None
+            return None, "not_completed"
         mr = done["order"]["mandate_receipt"]
         log(f"[acp] paid {co['price']} through {base}, settled at ledger #{mr.get('ledger')}")
-        return mr
+        return mr, None
     except Exception as e:                              # noqa: BLE001  (a broken checkout costs the deal, not the order)
         log(f"[acp] payment failed: {type(e).__name__}: {e}"[:300])
-        return None
+        return None, "error"
