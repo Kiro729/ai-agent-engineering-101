@@ -47,7 +47,7 @@ import catalog
 import market_anchor
 import shop_core
 from negotiation_memory import Journal
-from shop_data import ASKS, EPISODES, ITEMS, LEVELS, MEMORY
+from shop_data import ASKS, EPISODES, ITEMS, LEVELS, MEMORY, ROUND3_ASKS
 
 catalog.use(ITEMS)
 
@@ -237,11 +237,11 @@ class Shop(DurableObject):
                 self.sql.exec("INSERT INTO journal (j) VALUES (?)", json.dumps(ep))
             episodes = list(EPISODES)
         journal = Journal(episodes, lambda ep: self.sql.exec("INSERT INTO journal (j) VALUES (?)", json.dumps(ep)))
-        self.shop = shop_core.Shop(self.ask, journal, key=load_key(self.env, "SHOP_KEY"), asks=ASKS.get,
+        self.shop = shop_core.Shop(self.ask, journal, key=load_key(self.env, "SHOP_KEY"), asks=self.ask_for,
                                    market_mean=self.market_mean, levels=lambda i: tuple(LEVELS.get(i, ())),
                                    deal_note=DEAL_NOTE)
         self.open: dict[str, dict] = {}
-        self.stats = {"t": 0.0, "items": {}}
+        self.stats = {"t": 0.0, "items": {}, "round": None}
         # Round 3: checkout sessions live in memory like tasks; each settlement
         # (or refusal) is one stored row, the shop's half of market-kit.log.
         self.sql.exec("CREATE TABLE IF NOT EXISTS settles (t REAL, j TEXT)")
@@ -260,10 +260,28 @@ class Shop(DurableObject):
             self.stats["t"] = time.time()               # one try per TTL, even when it fails
             try:
                 r = await fetch(market_anchor.STATS, js({"signal": AbortSignal.timeout(3000)}))
-                self.stats["items"] = market_anchor.items_from(py(await r.json()))
+                data = py(await r.json())
+                self.stats["items"] = market_anchor.items_from(data)
+                if data.get("round") != self.stats.get("round"):
+                    print(f"[seller] market round {data.get('round')}; first asks now "
+                          f"{ {i: self._first_ask(i, data.get('round')) for i in ASKS} }", flush=True)
+                self.stats["round"] = data.get("round")
             except Exception:                           # noqa: BLE001  (no anchor this time)
                 pass
         return market_anchor.mean_of(self.stats["items"], item_id)
+
+    @staticmethod
+    def _first_ask(item_id: str, rnd):
+        """asks.json's first ask, or from Round 3 on its "round3" one: an opening
+        sale while buyers whose shops cannot settle look for new ones."""
+        if (rnd or 0) >= 3 and item_id in ROUND3_ASKS:
+            return ROUND3_ASKS[item_id]
+        return ASKS.get(item_id)
+
+    def ask_for(self, item_id: str):
+        """The round comes with the stats the shop reads for its market anchor
+        (every TTL), so Round 3 switches the asks without a deploy."""
+        return self._first_ask(item_id, self.stats.get("round"))
 
     def _save(self, task: dict, deal: dict | None) -> None:
         self.tasks[task["id"]] = {"task": task, "t": time.time()}
@@ -372,8 +390,9 @@ class Shop(DurableObject):
         return json.dumps({"total": len(self.shop.journal.episodes), "since": since,
                            "episodes": eps[:max(1, min(int(limit), 50000))]})
 
-    async def settle_log(self, n: int) -> str:
-        """Settlements newest first, in the kit's log words, with totals."""
+    async def settle_log(self, n: int, since: float | None = None) -> str:
+        """Settlements newest first, in the kit's log words, with totals; with
+        `since`, every one from that time on, oldest first (export_logs.py)."""
         self._setup()
         every = [dict(json.loads(r["j"]), t=r["t"]) for r in rows(self.sql.exec("SELECT t, j FROM settles ORDER BY t"))]
         for s in every:
@@ -384,9 +403,9 @@ class Shop(DurableObject):
         for s in every:
             for f in (s.get("failed") or []) if s["status"] != 200 else []:
                 refused[f] = refused.get(f, 0) + 1
+        recent = [s for s in every if s["t"] >= since] if since is not None else every[::-1][:max(1, min(int(n), 200))]
         return json.dumps({"settled": len(ok_), "refused": len(every) - len(ok_), "refused_checks": refused,
-                           "credits": sum(s["amount"] for s in ok_),
-                           "recent": every[::-1][:max(1, min(int(n), 200))]}, indent=1)
+                           "credits": sum(s["amount"] for s in ok_), "recent": recent}, indent=1)
 
 
 # ------------------------------------------------------------ the buyer
@@ -623,11 +642,16 @@ class Buyer(DurableObject):
         return json.dumps({"enabled": env_str(self.env, "BUYER_ENABLED") == "1", "busy": self.busy,
                            "shops_remembered": len(self.mem), **totals, "recent": recent})
 
-    async def order_log(self, n: int) -> str:
-        """The last n orders with their log lines, newest first."""
+    async def order_log(self, n: int, since: float | None = None) -> str:
+        """The last n orders with their log lines, newest first; with `since`,
+        up to n orders from that time on, oldest first, each with its time --
+        what export_logs.py pages through for the submission's log file."""
         self._setup()
-        return json.dumps([json.loads(r["j"]) for r in rows(
-            self.sql.exec("SELECT j FROM orders ORDER BY t DESC LIMIT ?", max(1, min(int(n), 50))))], indent=1)
+        if since is None:
+            return json.dumps([json.loads(r["j"]) for r in rows(
+                self.sql.exec("SELECT j FROM orders ORDER BY t DESC LIMIT ?", max(1, min(int(n), 50))))], indent=1)
+        return json.dumps([dict(json.loads(r["j"]), t=r["t"]) for r in rows(self.sql.exec(
+            "SELECT t, j FROM orders WHERE t > ? ORDER BY t LIMIT ?", float(since), max(1, min(int(n), 200))))])
 
 
 # ------------------------------------------------------------ the entry point
@@ -646,8 +670,13 @@ class Default(WorkerEntrypoint):
         if request.method == "POST":
             return Response(await shop.rpc(await request.text()), headers={"content-type": "application/json"})
         if u.path == "/shop/log":
-            n = parse_qs(u.query).get("n", ["20"])[0]
-            return Response(await shop.settle_log(int(n) if n.isdigit() else 20),
+            q = parse_qs(u.query)
+            n = q.get("n", ["20"])[0]
+            try:
+                since = float(q["since"][0]) if "since" in q else None
+            except ValueError:
+                return Response('{"error": "since is a number"}', status=400)
+            return Response(await shop.settle_log(int(n) if n.isdigit() else 20, since),
                             headers={"content-type": "application/json"})
         if u.path == "/shop/journal":
             q = parse_qs(u.query)
@@ -671,9 +700,14 @@ class Default(WorkerEntrypoint):
             }
             return Response(json.dumps(card), headers={"content-type": "application/json"})
         if u.path == "/buyer/log":
-            n = parse_qs(u.query).get("n", ["5"])[0]
+            q = parse_qs(u.query)
+            n = q.get("n", ["5"])[0]
+            try:
+                since = float(q["since"][0]) if "since" in q else None
+            except ValueError:
+                return Response('{"error": "since is a number"}', status=400)
             stub = self.env.BUYER.get(self.env.BUYER.idFromName("buyer"))
-            return Response(await stub.order_log(int(n) if n.isdigit() else 5),
+            return Response(await stub.order_log(int(n) if n.isdigit() else 5, since),
                             headers={"content-type": "application/json"})
         if u.path == "/buyer/status":
             stub = self.env.BUYER.get(self.env.BUYER.idFromName("buyer"))
