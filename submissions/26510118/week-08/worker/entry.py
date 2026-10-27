@@ -355,6 +355,17 @@ class Shop(DurableObject):
             self.sql.exec("INSERT INTO settles (t, j) VALUES (?, ?)", time.time(), json.dumps(dict(rec, status=status)))
         return json.dumps({"status": status, "body": out})
 
+    async def journal_dump(self, since: float, limit: int) -> str:
+        """The negotiation journal from `since`, oldest first: what reprice_r3.py
+        reprices from once the ledger stops showing budgets. Read from memory
+        (the journal loads once per object start), so it costs no SQL rows.
+        An episode holds the item, my asks, the buyer's offers, the outcome
+        and the price; no reserve and no buyer names."""
+        self._setup()
+        eps = [e for e in self.shop.journal.episodes if e.get("ts", 0) >= since]
+        return json.dumps({"total": len(self.shop.journal.episodes), "since": since,
+                           "episodes": eps[:max(1, min(int(limit), 50000))]})
+
     async def settle_log(self, n: int) -> str:
         """Settlements newest first, in the kit's log words, with totals."""
         self._setup()
@@ -632,6 +643,13 @@ class Default(WorkerEntrypoint):
             n = parse_qs(u.query).get("n", ["20"])[0]
             return Response(await shop.settle_log(int(n) if n.isdigit() else 20),
                             headers={"content-type": "application/json"})
+        if u.path == "/shop/journal":
+            q = parse_qs(u.query)
+            try:
+                since, limit = float(q.get("since", ["0"])[0]), int(q.get("limit", ["50000"])[0])
+            except ValueError:
+                return Response('{"error": "since and limit are numbers"}', status=400)
+            return Response(await shop.journal_dump(since, limit), headers={"content-type": "application/json"})
         if u.path == "/.well-known/agent-card.json":
             description, skill = shop_core.card_text(shop_core.NAME)
             card = {
