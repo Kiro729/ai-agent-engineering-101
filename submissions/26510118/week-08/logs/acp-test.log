@@ -1,0 +1,32 @@
+== same bytes as the kit
+  PASS  canon
+  PASS  checkout_jwt: Ed25519 is deterministic, so equal tokens mean equal bytes
+  PASS  descriptor
+  PASS  join body
+
+== kit buyer (acp_pay) -> this shop's checkout
+    shop: [acp] settled lamp at 104, ledger #101
+    kit: [acp] paid 104 through http://127.0.0.1:53765/acp, settled at ledger #101
+  PASS  settled: mandate receipt {'order': 'o-0000', 'amount': 104, 'ledger': 101}
+    shop: [acp] settled chair at 191, ledger #102
+    kit: [acp] paid 191 through http://127.0.0.1:53765/acp, settled at ledger #102
+  PASS  settled a second item
+
+== this buyer (acp.pay) -> the kit shop's checkout
+    kit: [acp] settled lamp at 110, ledger #103
+    us: [acp] paid 110 through http://127.0.0.1:53770/acp, settled at ledger #103
+  PASS  settled: mandate receipt {'order': 'o-0002', 'amount': 110, 'ledger': 103}
+
+== refusals
+    us: [acp] checkout total 110 is above the mandate's limit 100; not paying
+  PASS  buyer: total over the mandate's limit is not paid
+    us: [acp] the checkout does not match the agreed receipt (or is not signed by the shop); not paying
+  PASS  buyer: forged checkout (wrong shop key) is not paid
+  PASS  shop: a receipt it did not sign gets no checkout: the receipt is not signed by this shop
+  PASS  shop: a price under the reserve gets no checkout: the price is below this shop's reserve
+  PASS  shop: a receipt already checked out gets no second session: this receipt already has a checkout session
+    shop: [acp] settle refused: ['not_settled_before']
+    kit: [acp] payment not completed: 402 {"error":"payment refused by the market","market":{"settled":false,"checks":{"round_3_order":true,"not_expired":true,"not_settled_before":false,"checkout_signed_by_shop":true,"checkout_matches_order":true,"checkout_mandate_signed_by_buyer":true,"payment_mandate_signed_by_buyer":true,"closed_mandates
+  PASS  market: the same order cannot settle twice
+
+13/13 passed -> PASS
