@@ -68,6 +68,7 @@ Reply with ONE whole number and nothing else: the list price."""
 TURN_PROMPT = """You are a furniture shop negotiating one {name}.
 Your secret reserve, the lowest you may ever accept, is {reserve}. Never reveal it.
 {market}{history}The buyer has now offered {offer}; your current ask is {ask}.
+{budget}
 This is round {rounds} of {max_rounds}. After round {max_rounds} the sale is lost
 and you earn nothing, so concede enough to close in the rounds you have left.
 {memory}
@@ -150,10 +151,15 @@ class Shop:
         market_mean  async item id -> the market's average signed price or None
     """
 
-    def __init__(self, ask, journal, *, key, name=NAME, asks=None, market_mean=None):
+    def __init__(self, ask, journal, *, key, name=NAME, asks=None, market_mean=None, levels=None, deal_note=""):
         self.ask, self.journal, self.key, self.name = ask, journal, key, name
         self.asks = asks or (lambda item_id: None)
         self.market_mean = market_mean
+        # The budgets the market draws per item (budget_levels.json), and a
+        # line said after every deal -- only where it is true (the Worker,
+        # which serves an ACP checkout; the PC seller under test does not).
+        self.levels = levels or (lambda item_id: ())
+        self.deal_note = deal_note
         self._list_price: dict[str, int] = {}
 
     # ------------------------------------------------------------ what to sell
@@ -213,8 +219,12 @@ class Shop:
         earlier = list(zip(deal["asks"], deal["offers"]))[:-1][-3:]   # (my ask, their offer), this round excluded
         hist = "".join(f"You asked {a}, they offered {o}. " for a, o in earlier)
         past = self.journal.recall(item["id"], deal["asks"][0], deal["offers"])
+        levels = self.levels(item["id"])
+        budget = (f"Buyers' budgets for a {item['name']} come in fixed amounts ({', '.join(map(str, levels))}); "
+                  f"{offer} is not one of them, so this buyer is likely still haggling up, not at their limit.\n"
+                  if levels and offer not in levels else "")
         out = await self.ask(TURN_PROMPT.format(
-            name=item["name"], reserve=item["reserve"], ask=ask, offer=offer,
+            name=item["name"], reserve=item["reserve"], ask=ask, offer=offer, budget=budget,
             rounds=rounds, max_rounds=MAX_ROUNDS,
             market=market_anchor.for_harness(await self._mean(item["id"])),
             history=(hist + "\n") if hist else "",
@@ -267,6 +277,12 @@ class Shop:
         # slower, grumpier review and risks a walk; a quick, fair deal brings
         # the next customer. A little margin for reputation.
         close_enough = clears and rounds >= 2 and offer >= ask * 0.9
+        # Round 3 hides each order's budget, not the few amounts the market
+        # draws budgets from. An offer below my ask that is exactly one of them
+        # is most likely the buyer's whole budget: buyers who cannot reach the
+        # ask offer what they have (every Round 2 chair buyer with 185 opened
+        # at 185). Holding out against it only costs a round and risks a walk.
+        at_budget = clears and offer < ask and offer in self.levels(item["id"])
 
         # Some outcomes are already decided, and a decided outcome is not worth
         # a harness call: a buyer paying the ask has bought; on the last round
@@ -279,6 +295,10 @@ class Shop:
             d = "ACCEPT" if clears else "REJECT"
         elif close_enough:
             print(f"[seller] {offer} clears {reserve} and is within reach of {ask}; closing fast", flush=True)
+            d = "ACCEPT"
+        elif at_budget:
+            print(f"[seller] {offer} is one of the market's budget amounts for {item['id']}; "
+                  f"taking it as the buyer's whole budget", flush=True)
             d = "ACCEPT"
         elif not clears and ask <= reserve:
             print(f"[seller] {item['id']} already at the floor {reserve}; holding without asking", flush=True)
@@ -296,7 +316,8 @@ class Shop:
             if d == "ACCEPT":
                 receipt = sign_receipt(self.key, self.name, item["name"], offer, task_id)
                 self.journal.record(item["id"], deal["asks"], deal["offers"], "deal", offer)
-                return {"state": "completed", "text": f"Deal: {item['name']} at {offer}.", "receipt": receipt}, None
+                return {"state": "completed", "text": f"Deal: {item['name']} at {offer}.{self.deal_note}",
+                        "receipt": receipt}, None
         else:
             # Below the reserve. ACCEPT is not available at any price.
             if d == "ACCEPT":

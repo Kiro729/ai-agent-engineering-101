@@ -47,7 +47,7 @@ import catalog
 import market_anchor
 import shop_core
 from negotiation_memory import Journal
-from shop_data import ASKS, EPISODES, ITEMS, MEMORY
+from shop_data import ASKS, EPISODES, ITEMS, LEVELS, MEMORY
 
 catalog.use(ITEMS)
 
@@ -57,6 +57,11 @@ TERMINAL = {"TASK_STATE_COMPLETED", "TASK_STATE_REJECTED", "TASK_STATE_CANCELED"
 KEEP_TASKS = 3600         # finished tasks stay readable (GetTask) this long
 RECEIPT_KEYS = ("shop", "item", "price", "task")
 WINDOW = 50               # seconds of order-taking per cron tick (the cron fires every minute)
+# Said after every deal, because it is true here: buyers' review models repeat
+# what a shop says (week 8, EP 6), and LLM buyers pick shops by receipts and
+# signatures (99.3% of one buyer's reasons). No digits: buyers read numbers as prices.
+DEAL_NOTE = (" The receipt is signed with this shop's key, and the shop serves an ACP checkout at "
+             "/.well-known/acp.json, so the deal can settle at the market.")
 
 
 def js(obj):
@@ -233,7 +238,8 @@ class Shop(DurableObject):
             episodes = list(EPISODES)
         journal = Journal(episodes, lambda ep: self.sql.exec("INSERT INTO journal (j) VALUES (?)", json.dumps(ep)))
         self.shop = shop_core.Shop(self.ask, journal, key=load_key(self.env, "SHOP_KEY"), asks=ASKS.get,
-                                   market_mean=self.market_mean)
+                                   market_mean=self.market_mean, levels=lambda i: tuple(LEVELS.get(i, ())),
+                                   deal_note=DEAL_NOTE)
         self.open: dict[str, dict] = {}
         self.stats = {"t": 0.0, "items": {}}
         # Round 3: checkout sessions live in memory like tasks; each settlement

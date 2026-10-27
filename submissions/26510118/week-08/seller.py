@@ -122,6 +122,15 @@ class Seller(AgentExecutor):
         await TaskUpdater(event_queue=event_queue, task_id=task.id, context_id=task.context_id).cancel()
 
 
+def budget_levels():
+    """item id -> the budget amounts the market draws (budget_levels.json), or () without the file."""
+    try:
+        levels = json.loads((HERE / "budget_levels.json").read_text(encoding="utf-8"))["levels"]
+    except (OSError, ValueError, KeyError):
+        levels = {}
+    return lambda item_id: tuple(levels.get(item_id, ()))
+
+
 def build(port: int, name: str = NAME, public_url: str | None = None) -> Starlette:
     """The shop. `public_url` is the address the card advertises, which is not
     always the one the server listens on: a client reads the card and then
@@ -140,7 +149,7 @@ def build(port: int, name: str = NAME, public_url: str | None = None) -> Starlet
                            examples=["I want to buy a lamp", "something wooden to keep about 40 books", "90"])],
     )
     shop = shop_core.Shop(ask_claude, negotiation_memory.file_journal(), key=load_key(), name=name,
-                          asks=repriced, market_mean=market_mean)
+                          asks=repriced, market_mean=market_mean, levels=budget_levels())
     handler = DefaultRequestHandler(agent_executor=Seller(shop), task_store=InMemoryTaskStore(),
                                     agent_card=card)
     app = Starlette(routes=create_agent_card_routes(card) + create_jsonrpc_routes(handler, "/"))
