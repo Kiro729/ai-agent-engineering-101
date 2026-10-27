@@ -223,8 +223,8 @@ def g_cloudflare(S, snap):
     cf = snap.get("cloudflare_buyer")
     if not cf:
         return "(python make_report.py --snapshot 을 먼저 실행한다)"
-    span = (f"{datetime.fromtimestamp(cf['since']).strftime('%m-%d %H:%M')}-"
-            f"{datetime.fromtimestamp(cf['until']).strftime('%H:%M')}")
+    span = (f"{datetime.fromtimestamp(cf['since']).strftime('%m-%d %H:%M')} ~ "
+            f"{datetime.fromtimestamp(cf['until']).strftime('%m-%d %H:%M')}")
     rows = [[span, cf["orders"], cf["deals"], cf["verified"], cf["feasible"],
              f"{cf['feasible_deals']} ({cf['feasible_deals'] / max(1, cf['feasible']):.0%})",
              cf["refused"], cf["broke_off"]]]
